@@ -1,4 +1,6 @@
 # Molecular Dynamics Prediction Using SchNet and sGDML
+This project aims to evaluating two state-of-the-art machine learning models, SchNet and sGDML, for their ability to predict molecular forces and potential energy surfaces. It aims to replicate and extend the findings from the study by Vassilev-Galindo, Valentin, et al., titled "Challenges for machine learning force fields in reproducing potential energy surfaces of flexible molecules" (The Journal of Chemical Physics, 2021). The focus is on using the same dataset and preparing the models for using them to make predictions on various others organic molecules. The report on the project work explores the implementation challenges, computational requirements, and model performance, highlighting key observations and insights related to molecular dynamics predictions.
+
 
 ## SchNet
 
@@ -12,7 +14,7 @@ pip install schnetpack
 Make sure to install all the dependencies required for SchNet. You can refer to the official [SchNetPack documentation](https://www.schnetpack.org/) for detailed installation instructions.
 
 ### Dataset
-You can download the dataset from the following link: [Dataset Link](#). I have provided 1 file for reference here.
+You can download the dataset from the following link: [Dataset Link](https://pubs.aip.org/jcp/article-supplement/313847/zip/094119_1_supplements/). I have provided 1 file for reference here.
 
 ### Workflow
 1. **Convert XYZ Dataset Files to NPZ**: Before you start training, you need to convert the XYZ files to NPZ files. This can be done by running the script `xyz_npz.py`.
