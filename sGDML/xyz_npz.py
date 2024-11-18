@@ -53,8 +53,8 @@ def parse_xyz_file(file_path):
     return np.array(positions), np.array(atomic_numbers), np.array(forces), np.array(energies)
 
 # Define file paths
-xyz_file_path = '/home/AnirbanMondal_grp/23110035/sgdml/Datasets/Glycine.xyz'
-npz_file_path = '/home/AnirbanMondal_grp/23110035/sgdml/Glycine.npz'
+xyz_file_path = '/home/sgdml/Datasets/Glycine.xyz'
+npz_file_path = '/home/sgdml/Glycine.npz'
 
 # Parse the XYZ file
 positions, atomic_numbers, forces, energies = parse_xyz_file(xyz_file_path)

@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from sgdml.train import GDMLTrain
 
-dataset = np.load('/home/AnirbanMondal_grp/23110035/sgdml/Azobenzene_rotation.npz')
+dataset = np.load('/home/sgdml/Azobenzene_rotation.npz')
 n_train = 200
 
 energy_mean = np.mean(dataset['E'])

@@ -3,13 +3,13 @@ from sgdml.predict import GDMLPredict
 from sgdml.utils import io
 
 # Load the pre-trained GDML model
-model = np.load('/home/AnirbanMondal_grp/23110035/sgdml/m_azorot_2.npz')
+model = np.load('/home/sgdml/m_azorot_2.npz')
 gdml = GDMLPredict(model)
 
 # File path to the .xyz file
-file_path = '/home/AnirbanMondal_grp/23110035/sgdml/Datasets/Azobenzene_rotation.xyz'
+file_path = '/home/sgdml/Datasets/Azobenzene_rotation.xyz'
 
-r, metadata = io.read_xyz('/home/AnirbanMondal_grp/23110035/sgdml/Datasets/Azobenzene_rotation.xyz')
+r, metadata = io.read_xyz('/home/sgdml/Datasets/Azobenzene_rotation.xyz')
 
 def parse_xyz_file(file_path):
     positions = []
