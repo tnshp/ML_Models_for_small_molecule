@@ -1,4 +1,5 @@
 import numpy as np
+import argparse 
 
 def parse_xyz_file(file_path):
     positions = []
@@ -52,18 +53,24 @@ def parse_xyz_file(file_path):
     
     return np.array(positions), np.array(atomic_numbers), np.array(forces), np.array(energies)
 
-# Define file paths
-xyz_file_path = '/home/sgdml/Datasets/Glycine.xyz'
-npz_file_path = '/home/sgdml/Glycine.npz'
+
+parser = argparse.ArgumentParser(description="A simple script that to convert xyz to npz format")
+
+parser.add_argument("-x","--xyz_file_path", type=str, help="xyz file path")
+parser.add_argument("-n","--npz_file_path", type=str, help="npz file path")
+
+# Parse arguments
+args = parser.parse_args()
+
 
 # Parse the XYZ file
-positions, atomic_numbers, forces, energies = parse_xyz_file(xyz_file_path)
+positions, atomic_numbers, forces, energies = parse_xyz_file(args.xyz_file_path)
 
 print(forces)
 print(energies)
 
 # Save data to NPZ file
-np.savez(npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
+np.savez(args.npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
 
-print(f"Data saved to {npz_file_path}")
+print(f"Data saved to {args.npz_file_path}")
 
