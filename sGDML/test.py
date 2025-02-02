@@ -1,15 +1,21 @@
 import numpy as np
 from sgdml.predict import GDMLPredict
 from sgdml.utils import io
+import argparse
+
+parser = argparse.ArgumentParser(description="Training loop for sGDML")
+
+parser.add_argument("-m","--model", type=str, help="model file path")
+parser.add_argument("-d","--dataset", type=str, help="dataset file path")
+
+# Parse arguments
+args = parser.parse_args()
 
 # Load the pre-trained GDML model
-model = np.load('/home/sgdml/m_azorot_2.npz')
+model = np.load(args.model)
 gdml = GDMLPredict(model)
 
-# File path to the .xyz file
-file_path = '/home/sgdml/Datasets/Azobenzene_rotation.xyz'
-
-r, metadata = io.read_xyz('/home/sgdml/Datasets/Azobenzene_rotation.xyz')
+r, metadata = io.read_xyz(args.dataset)
 
 def parse_xyz_file(file_path):
     positions = []
@@ -25,7 +31,7 @@ def parse_xyz_file(file_path):
         'Zn': 30, 'Ga': 31, 'Ge': 32, 'As': 33, 'Se': 34, 'Br': 35, 'Kr': 36,
     }
     
-    with open(file_path, 'r') as file:
+    with open(args.dataset, 'r') as file:
         lines = file.readlines()
     
     i = 0
@@ -63,7 +69,7 @@ def parse_xyz_file(file_path):
     
     return np.array(positions), np.array(atomic_numbers), np.array(forces), np.array(energies)
         
-positions, atomic_numbers, forces, energies = parse_xyz_file(file_path)
+positions, atomic_numbers, forces, energies = parse_xyz_file(args.dataset)
 
 energy_mean = np.mean(energies)
 energy_std = np.std(energies)
@@ -90,7 +96,7 @@ def mae(true_values, predicted_values):
 rmse_energy = rmse(energies, np.array(predicted_energy))
 mae_energy = mae(energies, np.array(predicted_energy))
 
-# Calculate RMSE and MAE for forces
+# Calculate MSE and MAE for forces
 print(forces)
 print(predicted_forces)
 rmse_forces = rmse(forces, predicted_forces)
