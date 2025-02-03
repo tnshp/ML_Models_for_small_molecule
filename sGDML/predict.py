@@ -2,10 +2,10 @@ import numpy as np
 from sgdml.predict import GDMLPredict
 from sgdml.utils import io
 
-model = np.load('m_Azobenzene_inversion.npz')
+model = np.load('sGDML/saved/glycine_200.npz')
 gdml = GDMLPredict(model)
 
-r,_ = io.read_xyz('Azobenzene_inversion.xyz')
+r,_ = io.read_xyz('Datasets/Glycine.xyz')
 e,f = gdml.predict(r)
 
 with open("output.txt", "w") as file:

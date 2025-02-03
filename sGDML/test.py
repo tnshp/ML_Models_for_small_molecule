@@ -3,7 +3,7 @@ from sgdml.predict import GDMLPredict
 from sgdml.utils import io
 import argparse
 
-parser = argparse.ArgumentParser(description="Training loop for sGDML")
+parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 
 parser.add_argument("-m","--model", type=str, help="model file path")
 parser.add_argument("-d","--dataset", type=str, help="dataset file path")
@@ -77,12 +77,16 @@ energy_std = np.std(energies)
 # Normalize the energies from the test set
 energies = (energies - energy_mean) / energy_std
 
+print(r.shape)
+
 # Predict energy and forces using the GDML model
 predicted_energy, predicted_forces = gdml.predict(r)
-
+print(predicted_energy.shape)
+print(predicted_forces.shape)
 
 if predicted_forces.shape != forces.shape:
-    predicted_forces = predicted_forces.reshape(-1, 24, 3)
+    M, N3 = predicted_forces.shape
+    predicted_forces = predicted_forces.reshape(-1, N3//3 , 3)
 
 # Function to calculate RMSE
 def rmse(true_values, predicted_values):
