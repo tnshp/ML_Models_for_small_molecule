@@ -31,5 +31,5 @@ task = gdml_train.create_task(modified_data, n_train,\
 
 model = gdml_train.train(task)
 
-np.savez_compressed(args.save, **model)
+np.savez_compressed(args.save + f"_{n_train}.npz", **model)
 print("Model Saved!!!")

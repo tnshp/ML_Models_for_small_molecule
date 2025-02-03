@@ -1,6 +1,13 @@
 import numpy as np
 from sgdml.predict import GDMLPredict
+import argparse 
 from sgdml.utils import io
+
+parser = argparse.ArgumentParser(description="Predict loop for sGDML")
+
+parser.add_argument("-d","--dataset", type=str, help="dataset file path")
+parser.add_argument("-s","--save", type=str, help="model save path")
+parser.add_argument("-n","--n_train", default=200, type=int)
 
 model = np.load('sGDML/saved/glycine_200.npz')
 gdml = GDMLPredict(model)
