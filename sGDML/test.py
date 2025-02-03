@@ -77,12 +77,9 @@ energy_std = np.std(energies)
 # Normalize the energies from the test set
 energies = (energies - energy_mean) / energy_std
 
-print(r.shape)
-
 # Predict energy and forces using the GDML model
 predicted_energy, predicted_forces = gdml.predict(r)
-print(predicted_energy.shape)
-print(predicted_forces.shape)
+
 
 if predicted_forces.shape != forces.shape:
     M, N3 = predicted_forces.shape
@@ -101,8 +98,7 @@ rmse_energy = rmse(energies, np.array(predicted_energy))
 mae_energy = mae(energies, np.array(predicted_energy))
 
 # Calculate MSE and MAE for forces
-print(forces)
-print(predicted_forces)
+
 rmse_forces = rmse(forces, predicted_forces)
 mae_forces = mae(forces, predicted_forces)
 
