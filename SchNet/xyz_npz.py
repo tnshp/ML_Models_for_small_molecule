@@ -1,34 +1,6 @@
-# from ase.io import read
-# import numpy as np
-# from ase import Atoms, Atom
-# import torch
-# import schnetpack as spk
-# from schnetpack import representation as rp
-# from schnetpack.data import ASEAtomsData, AtomsDataFormat, load_dataset, create_dataset
-# from torch.utils.data import DataLoader
-# import torch.optim as optim
-
-# distance_unit = 'Å'  # Angstrom
-# property_unit_dict = {
-#     'energy': 'kcal/mol',   # Example property unit, you can add more if needed
-#     'forces': 'kcal/mol/Å'
-# }
-
-# # Define the path to save the database
-# db_file = r'Datasets\Datasets\Azobenzene_inversion.db'
-# # Create the dataset using create_dataset
-# data = create_dataset(
-#     datapath=db_file, 
-#     format=AtomsDataFormat.ASE,
-#     distance_unit=distance_unit, 
-#     property_unit_dict=property_unit_dict
-# )
-
-# print(data)
-
-
 import numpy as np
-
+import argparse 
+ 
 def parse_xyz_file(file_path):
     positions = []
     atomic_numbers = []
@@ -43,6 +15,7 @@ def parse_xyz_file(file_path):
         'Zn': 30, 'Ga': 31, 'Ge': 32, 'As': 33, 'Se': 34, 'Br': 35, 'Kr': 36,
     }
     
+
     with open(file_path, 'r') as file:
         lines = file.readlines()
     
@@ -81,14 +54,24 @@ def parse_xyz_file(file_path):
     
     return np.array(positions), np.array(atomic_numbers), np.array(forces), np.array(energies)
 
-# Define file paths
-xyz_file_path = 'md\Datasets\Azobenzene_inversion.xyz'
-npz_file_path = 'md\Azobenzene.npz'
+
+parser = argparse.ArgumentParser(description="A simple script that to convert xyz to npz format")
+
+parser.add_argument("-x","--xyz_file_path", type=str, help="xyz file path")
+parser.add_argument("-n","--npz_file_path", type=str, help="npz file path")
+
+# Parse arguments
+args = parser.parse_args()
+
 
 # Parse the XYZ file
-positions, atomic_numbers, forces, energies = parse_xyz_file(xyz_file_path)
+positions, atomic_numbers, forces, energies = parse_xyz_file(args.xyz_file_path)
+
+# print(forces)
+# print(energies)
 
 # Save data to NPZ file
-np.savez(npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
+np.savez(args.npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
 
-print(f"Data saved to {npz_file_path}")
+print(f"Data saved to {args.npz_file_path}")
+

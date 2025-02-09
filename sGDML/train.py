@@ -9,6 +9,13 @@ parser.add_argument("-d","--dataset", type=str, help="dataset file path")
 parser.add_argument("-s","--save", type=str, help="model save path")
 parser.add_argument("-n","--n_train", default=200, type=int)
 
+parser.add_argument(
+    '-e',
+    '--use_energy',
+    dest='use energy',
+    help='use energy for training',
+)
+
 # Parse arguments
 args = parser.parse_args()
 
@@ -25,9 +32,16 @@ modified_data = {key: dataset[key] for key in dataset}
 modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
 gdml_train = GDMLTrain()
 
-task = gdml_train.create_task(modified_data, n_train,\
-        valid_dataset=dataset, n_valid=40,\
-        sig=20, lam=1e-10)
+task = gdml_train.create_task(
+        modified_data, 
+        n_train,
+        valid_dataset=dataset, 
+        n_valid=40,
+        sig=20, 
+        lam=1e-10,
+        use_E_cstr=True,
+        use_E=True  # Focus only on energy)
+) 
 
 model = gdml_train.train(task)
 

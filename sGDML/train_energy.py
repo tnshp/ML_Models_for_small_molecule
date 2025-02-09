@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 from sgdml.train import GDMLTrain
-
+ 
 # Load the dataset
 dataset = np.load('/home/sgdml/Azobenzene_rotation.npz')
 n_train = 200  # Increased training set size
