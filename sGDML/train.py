@@ -12,6 +12,7 @@ parser.add_argument("-n","--n_train", default=200, type=int)
 parser.add_argument(
     '-e',
     '--use_energy',
+    action='store_true',
     dest='use energy',
     help='use energy for training',
 )
@@ -38,6 +39,7 @@ task = gdml_train.create_task(
         valid_dataset=dataset, 
         n_valid=40,
         sig=20, 
+        use_sym=True,
         lam=1e-10,
         use_E_cstr=True,
         use_E=True  # Focus only on energy)
