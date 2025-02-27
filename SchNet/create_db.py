@@ -3,7 +3,7 @@ import os
 import argparse
 from ase import Atoms
 from schnetpack.data import ASEAtomsData
-
+ 
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Create SchNetPack database from NPZ file')
