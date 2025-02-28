@@ -4,6 +4,7 @@ import torchmetrics
 import pytorch_lightning as pl
 import argparse
 import sys
+import numpy as np
 
 sys.path.insert(0, 'src\schnetpack')
 
@@ -18,21 +19,59 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from schnetpack.nn import cutoff, radial
 
+class CustomProgressBar(pl.callbacks.TQDMProgressBar):
+    def init_validation_tqdm(self):
+        return None
+
+class ForceTask(spk.task.AtomisticTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.train_mae = torchmetrics.MeanAbsoluteError()
+        self.train_rmse = torchmetrics.MeanSquaredError(squared=False)
+        self.test_mae = torchmetrics.MeanAbsoluteError()
+        self.test_rmse = torchmetrics.MeanSquaredError(squared=False)
+
+    def training_step(self, batch, batch_idx):
+        result = super().training_step(batch, batch_idx)
+        pred = result['forces']
+        target = batch['forces']
+        self.train_mae(pred, target)
+        self.train_rmse(pred, target)
+        return result
+
+    def on_train_epoch_end(self):
+        print(f"Train MAE: {self.train_mae.compute():.4f}")
+        print(f"Train RMSE: {self.train_rmse.compute():.4f}")
+        self.train_mae.reset()
+        self.train_rmse.reset()
+
+    def test_step(self, batch, batch_idx):
+        result = super().test_step(batch, batch_idx)
+        pred = result['forces']
+        target = batch['forces']
+        self.test_mae(pred, target)
+        self.test_rmse(pred, target)
+        return result
+
+    def on_test_epoch_end(self):
+        print(f"Test MAE: {self.test_mae.compute():.4f}")
+        print(f"Test RMSE: {self.test_rmse.compute():.4f}")
+        self.test_mae.reset()
+        self.test_rmse.reset()
+
 def parse_args():
     parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
     parser.add_argument("--db_file", type=str, required=True, help="Path to the database file")
     parser.add_argument("--output_dir", type=str, required=True, help="Directory for output files")
-    parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
-
     parser.add_argument("--batch_size", type=int, default=24, help="Batch size for training")
     parser.add_argument("--cutoff", type=float, default=5.0, help="Cutoff distance for interactions")
     parser.add_argument("--n_atom_basis", type=int, default=128, help="Number of features to describe atomic environments")
     parser.add_argument("--n_interactions", type=int, default=6, help="Number of interaction blocks")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=5, help="Maximum number of training epochs")
-    
+    parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
     parser.add_argument("--num_train", type=int, default=1000, help="Number of samples to use for training")
-    parser.add_argument("--gpus", type=int, default=0, help="Number of GPUs to use (-1 for all available)")
+    parser.add_argument("--gpus", type=int, default=-1, help="Number of GPUs to use (-1 for all available)")
     return parser.parse_args()
 
 def main(args):
@@ -40,11 +79,12 @@ def main(args):
     dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
     print(f"Total dataset length: {len(dataset)}")
 
-    # Set num_train and calculate num_val
-    args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
-    args.num_val = len(dataset) - args.num_train
+    # Set num_train and calculate num_val and num_test
+    args.num_train = min(args.num_train, len(dataset) - 2)  # Ensure at least one sample for validation and test
+    args.num_val = (len(dataset) - args.num_train) // 2
+    args.num_test = len(dataset) - args.num_train - args.num_val
 
-    print(f"Using {args.num_train} samples for training and {args.num_val} samples for validation.")
+    print(f"Using {args.num_train} samples for training, {args.num_val} for validation, and {args.num_test} for testing.")
 
     # Use the file path directly for AtomsDataModule
     custom_data = spk.data.AtomsDataModule(
@@ -54,12 +94,13 @@ def main(args):
         property_units={'forces':'kcal/mol/Ang'},
         num_train=args.num_train,
         num_val=args.num_val,
+        num_test=args.num_test,
         transforms=[
             trn.ASENeighborList(cutoff=args.cutoff),
             trn.CastTo32()
         ],
-        num_workers=4,  # Increased for better performance
-        pin_memory=True,  # Enable pin_memory for faster data transfer to GPU
+        num_workers=4,
+        pin_memory=True,
         split_file=None
     )
 
@@ -68,9 +109,11 @@ def main(args):
 
     train_loader = custom_data.train_dataloader()
     val_loader = custom_data.val_dataloader()
+    test_loader = custom_data.test_dataloader()
 
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Validation dataset length: {len(val_loader.dataset)}")
+    print(f"Test dataset length: {len(test_loader.dataset)}")
 
     cutoff_fn = cutoff.CosineCutoff(cutoff=args.cutoff)
     radial_basis = radial.GaussianRBF(cutoff=args.cutoff, n_rbf=50)
@@ -102,7 +145,7 @@ def main(args):
 
     print("Output forces: \n", output_forces)
 
-    task = spk.task.AtomisticTask(
+    task = ForceTask(
         model=nnpot,
         outputs=[output_forces],
         optimizer_cls=torch.optim.AdamW,
@@ -117,20 +160,21 @@ def main(args):
             monitor="val_loss",
             mode="min",
             save_top_k=1
-        )
+        ),
+        CustomProgressBar()
     ]
 
     # Determine GPU usage
     if args.gpus == -1:
         args.gpus = torch.cuda.device_count()
-
+    
     if args.gpus > 0:
         accelerator = 'gpu'
         devices = args.gpus
         strategy = 'ddp' if devices > 1 else 'auto'
     else:
         accelerator = 'cpu'
-        devices = 1
+        devices = None
         strategy = 'auto'
 
     print(f"Using accelerator: {accelerator}, devices: {devices}, strategy: {strategy}")
@@ -147,6 +191,9 @@ def main(args):
     )
 
     trainer.fit(task, train_loader, val_loader)
+    
+    # Test the model
+    trainer.test(task, test_loader)
 
     torch.save(task, os.path.join(args.output_dir, args.model_save_path))
     print("Model saved successfully.")
