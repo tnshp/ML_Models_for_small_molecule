@@ -20,10 +20,10 @@ from schnetpack.nn import cutoff, radial
 
 def parse_args():
     parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
-    parser.add_argument("--output_dir", type=str,  help="Directory for output files")
-    parser.add_argument("--db_file", type=str,  help="Path to the database file")
+    parser.add_argument("--db_file", type=str, required=True, help="Path to the database file")
+    parser.add_argument("--output_dir", type=str, required=True, help="Directory for output files")
     parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
-    
+
     parser.add_argument("--batch_size", type=int, default=24, help="Batch size for training")
     parser.add_argument("--cutoff", type=float, default=5.0, help="Cutoff distance for interactions")
     parser.add_argument("--n_atom_basis", type=int, default=128, help="Number of features to describe atomic environments")
@@ -31,12 +31,20 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=5, help="Maximum number of training epochs")
     
+    parser.add_argument("--num_train", type=int, default=1000, help="Number of samples to use for training")
+    parser.add_argument("--gpus", type=int, default=-1, help="Number of GPUs to use (-1 for all available)")
     return parser.parse_args()
 
 def main(args):
     # Load dataset, focusing only on forces
     dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
-    print(f"Dataset length: {len(dataset)}")
+    print(f"Total dataset length: {len(dataset)}")
+
+    # Set num_train and calculate num_val
+    args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
+    args.num_val = len(dataset) - args.num_train
+
+    print(f"Using {args.num_train} samples for training and {args.num_val} samples for validation.")
 
     # Use the file path directly for AtomsDataModule
     custom_data = spk.data.AtomsDataModule(
@@ -44,14 +52,14 @@ def main(args):
         batch_size=args.batch_size,
         distance_unit='Ang',
         property_units={'forces':'kcal/mol/Ang'},
-        num_train=int(len(dataset)*0.8),
-        num_val=int(len(dataset)*0.2),
+        num_train=args.num_train,
+        num_val=args.num_val,
         transforms=[
             trn.ASENeighborList(cutoff=args.cutoff),
             trn.CastTo32()
         ],
-        num_workers=0,
-        pin_memory=False,
+        num_workers=4,  # Increased for better performance
+        pin_memory=True,  # Enable pin_memory for faster data transfer to GPU
         split_file=None
     )
 
@@ -112,17 +120,32 @@ def main(args):
         )
     ]
 
+    # Determine GPU usage
+    if args.gpus == -1:
+        args.gpus = torch.cuda.device_count()
+    
+    if args.gpus > 0:
+        accelerator = 'gpu'
+        devices = args.gpus
+    else:
+        accelerator = 'cpu'
+        devices = None
+
+    print(f"Using accelerator: {accelerator}, devices: {devices}")
+
     trainer = pl.Trainer(
         callbacks=callbacks,
         logger=logger,
         default_root_dir=args.output_dir,
         max_epochs=args.max_epochs,
-        accelerator='cpu',
+        accelerator=accelerator,
+        devices=devices,
+        strategy='ddp' if devices and devices > 1 else None,  # Use DDP for multi-GPU training
     )
 
     trainer.fit(task, train_loader, val_loader)
 
-    torch.save(task, args.model_save_path)
+    torch.save(task, os.path.join(args.output_dir, args.model_save_path))
     print("Model saved successfully.")
 
 if __name__ == "__main__":
