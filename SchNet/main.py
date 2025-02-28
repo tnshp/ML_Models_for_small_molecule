@@ -4,7 +4,6 @@ import torchmetrics
 import pytorch_lightning as pl
 import argparse
 import sys
-import numpy as np
 
 sys.path.insert(0, 'src\schnetpack')
 
@@ -13,110 +12,46 @@ import schnetpack.representation as rep
 import schnetpack.atomistic as atm
 import schnetpack.transform as trn
 from schnetpack.data import ASEAtomsData
-from torch_geometric.loader import DataLoader
-from torch.utils.data import random_split
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.progress import TQDMProgressBar
 
 from schnetpack.nn import cutoff, radial
 
-class CustomProgressBar(pl.callbacks.TQDMProgressBar):
+class MetricTracker(pl.Callback):
+    def __init__(self):
+        super().__init__()
+        self.metrics = {
+            'train': {'forces_mae': [], 'forces_rmse': [], 'energy_mae': [], 'energy_rmse': []},
+            'val': {'forces_mae': [], 'forces_rmse': [], 'energy_mae': [], 'energy_rmse': []},
+            'test': {'forces_mae': [], 'forces_rmse': [], 'energy_mae': [], 'energy_rmse': []}
+        }
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        self._log_metrics('val', pl_module)
+
+    def on_test_epoch_end(self, trainer, pl_module):
+        self._log_metrics('test', pl_module)
+
+    def _log_metrics(self, stage, pl_module):
+        metrics = {
+            'forces_mae': pl_module.val_forces_mae.compute(),
+            'forces_rmse': pl_module.val_forces_rmse.compute(),
+            'energy_mae': pl_module.val_energy_mae.compute(),
+            'energy_rmse': pl_module.val_energy_rmse.compute()
+        }
+        for name, value in metrics.items():
+            self.metrics[stage][name].append(value.item())
+            pl_module.log(f"{stage}_{name}", value, prog_bar=True)
+            
+        print(f"\n{stage.capitalize()} Metrics:")
+        print(f"Forces MAE: {metrics['forces_mae']:.4f}, RMSE: {metrics['forces_rmse']:.4f}")
+        print(f"Energy MAE: {metrics['energy_mae']:.4f}, RMSE: {metrics['energy_rmse']:.4f}")
+
+class CustomProgressBar(TQDMProgressBar):
     def init_validation_tqdm(self):
-        return None
-
-class ForceTask(spk.task.AtomisticTask):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.train_mae = torchmetrics.MeanAbsoluteError()
-        self.train_rmse = torchmetrics.MeanSquaredError(squared=False)
-        self.test_mae = torchmetrics.MeanAbsoluteError()
-        self.test_rmse = torchmetrics.MeanSquaredError(squared=False)
-
-    def training_step(self, batch, batch_idx):
-        result = super().training_step(batch, batch_idx)
-        pred = result['forces']
-        target = batch['forces']
-        self.train_mae(pred, target)
-        self.train_rmse(pred, target)
-        return result
-
-    def on_train_epoch_end(self):
-        print(f"Train MAE: {self.train_mae.compute():.4f}")
-        print(f"Train RMSE: {self.train_rmse.compute():.4f}")
-        self.train_mae.reset()
-        self.train_rmse.reset()
-
-    def test_step(self, batch, batch_idx):
-        result = super().test_step(batch, batch_idx)
-        pred = result['forces']
-        target = batch['forces']
-        self.test_mae(pred, target)
-        self.test_rmse(pred, target)
-        return result
-
-    def on_test_epoch_end(self):
-        print(f"Test MAE: {self.test_mae.compute():.4f}")
-        print(f"Test RMSE: {self.test_rmse.compute():.4f}")
-        self.test_mae.reset()
-        self.test_rmse.reset()
-
-class ForceEnergyTask(spk.task.AtomisticTask):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.train_force_mae = torchmetrics.MeanAbsoluteError()
-        self.train_force_rmse = torchmetrics.MeanSquaredError(squared=False)
-        self.train_energy_mae = torchmetrics.MeanAbsoluteError()
-        self.train_energy_rmse = torchmetrics.MeanSquaredError(squared=False)
-        self.test_force_mae = torchmetrics.MeanAbsoluteError()
-        self.test_force_rmse = torchmetrics.MeanSquaredError(squared=False)
-        self.test_energy_mae = torchmetrics.MeanAbsoluteError()
-        self.test_energy_rmse = torchmetrics.MeanSquaredError(squared=False)
-
-    def training_step(self, batch, batch_idx):
-        result = super().training_step(batch, batch_idx)
-        pred_forces = result['forces']
-        target_forces = batch['forces']
-        pred_energy = result['energy']
-        target_energy = batch['energy']
-        
-        self.train_force_mae(pred_forces, target_forces)
-        self.train_force_rmse(pred_forces, target_forces)
-        self.train_energy_mae(pred_energy, target_energy)
-        self.train_energy_rmse(pred_energy, target_energy)
-        return result
-
-    def on_train_epoch_end(self):
-        print(f"Train Force MAE: {self.train_force_mae.compute():.4f}")
-        print(f"Train Force RMSE: {self.train_force_rmse.compute():.4f}")
-        print(f"Train Energy MAE: {self.train_energy_mae.compute():.4f}")
-        print(f"Train Energy RMSE: {self.train_energy_rmse.compute():.4f}")
-        self.train_force_mae.reset()
-        self.train_force_rmse.reset()
-        self.train_energy_mae.reset()
-        self.train_energy_rmse.reset()
-
-    def test_step(self, batch, batch_idx):
-        result = super().test_step(batch, batch_idx)
-        pred_forces = result['forces']
-        target_forces = batch['forces']
-        pred_energy = result['energy']
-        target_energy = batch['energy']
-        
-        self.test_force_mae(pred_forces, target_forces)
-        self.test_force_rmse(pred_forces, target_forces)
-        self.test_energy_mae(pred_energy, target_energy)
-        self.test_energy_rmse(pred_energy, target_energy)
-        return result
-
-    def on_test_epoch_end(self):
-        print(f"Test Force MAE: {self.test_force_mae.compute():.4f}")
-        print(f"Test Force RMSE: {self.test_force_rmse.compute():.4f}")
-        print(f"Test Energy MAE: {self.test_energy_mae.compute():.4f}")
-        print(f"Test Energy RMSE: {self.test_energy_rmse.compute():.4f}")
-        self.test_force_mae.reset()
-        self.test_force_rmse.reset()
-        self.test_energy_mae.reset()
-        self.test_energy_rmse.reset()
-
+        bar = super().init_validation_tqdm()
+        bar.disable = True
+        return bar
 
 def parse_args():
     parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
@@ -131,21 +66,24 @@ def parse_args():
     parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
     parser.add_argument("--num_train", type=int, default=1000, help="Number of samples to use for training")
     parser.add_argument("--gpus", type=int, default=-1, help="Number of GPUs to use (-1 for all available)")
+    parser.add_argument("--test_ratio", type=float, default=0.1, help="Ratio of dataset to use for testing")
     return parser.parse_args()
 
 def main(args):
-    # Load dataset, focusing only on forces
+    # Load dataset with both forces and energy
     dataset = ASEAtomsData(args.db_file, load_properties=['forces', 'energy'])
     print(f"Total dataset length: {len(dataset)}")
 
-    # Set num_train and calculate num_val and num_test
-    args.num_train = min(args.num_train, len(dataset) - 2)  # Ensure at least one sample for validation and test
-    args.num_val = (len(dataset) - args.num_train) // 2
-    args.num_test = len(dataset) - args.num_train - args.num_val
+    # Calculate splits
+    total = len(dataset)
+    args.num_train = min(args.num_train, total - 2)
+    num_val_test = total - args.num_train
+    args.num_val = int(num_val_test * (1 - args.test_ratio))
+    args.num_test = num_val_test - args.num_val
 
-    print(f"Using {args.num_train} samples for training, {args.num_val} for validation, and {args.num_test} for testing.")
+    print(f"Using {args.num_train} train, {args.num_val} val, and {args.num_test} test samples")
 
-    # Use the file path directly for AtomsDataModule
+    # Configure data module
     custom_data = spk.data.AtomsDataModule(
         datapath=args.db_file,
         batch_size=args.batch_size,
@@ -166,14 +104,7 @@ def main(args):
     custom_data.prepare_data()
     custom_data.setup()
 
-    train_loader = custom_data.train_dataloader()
-    val_loader = custom_data.val_dataloader()
-    test_loader = custom_data.test_dataloader()
-
-    print(f"Training dataset length: {len(train_loader.dataset)}")
-    print(f"Validation dataset length: {len(val_loader.dataset)}")
-    print(f"Test dataset length: {len(test_loader.dataset)}")
-
+    # Model configuration
     cutoff_fn = cutoff.CosineCutoff(cutoff=args.cutoff)
     radial_basis = radial.GaussianRBF(cutoff=args.cutoff, n_rbf=50)
 
@@ -195,48 +126,58 @@ def main(args):
         postprocessors=[trn.CastTo64()]
     )
 
+    # Configure outputs with metrics
     output_forces = spk.task.ModelOutput(
         name='forces',
         loss_fn=torch.nn.MSELoss(),
-        loss_weight=1.0,
-        metrics={"MAE": torchmetrics.MeanAbsoluteError()}
+        loss_weight=0.7,
+        metrics={
+            'MAE': torchmetrics.MeanAbsoluteError(),
+            'RMSE': torchmetrics.MeanSquaredError(squared=False)
+        }
     )
 
-    print("Output forces: \n", output_forces)
+    output_energy = spk.task.ModelOutput(
+        name='energy',
+        loss_fn=torch.nn.MSELoss(),
+        loss_weight=0.3,
+        metrics={
+            'MAE': torchmetrics.MeanAbsoluteError(),
+            'RMSE': torchmetrics.MeanSquaredError(squared=False)
+        }
+    )
 
-    task = ForceTask(
+    # Configure training task
+    task = spk.task.AtomisticTask(
         model=nnpot,
-        outputs=[output_forces],
+        outputs=[output_forces, output_energy],
         optimizer_cls=torch.optim.AdamW,
         optimizer_args={"lr": args.lr}
     )
 
+    # Configure trainer
     logger = pl.loggers.TensorBoardLogger(save_dir=args.output_dir)
+    metric_tracker = MetricTracker()
+    
     callbacks = [
         ModelCheckpoint(
             dirpath=os.path.join(args.output_dir, "checkpoints"),
-            filename="best_inference_model",
+            filename="best_model",
             monitor="val_loss",
             mode="min",
             save_top_k=1
         ),
+        metric_tracker,
         CustomProgressBar()
     ]
 
-    # Determine GPU usage
+    # GPU configuration
     if args.gpus == -1:
         args.gpus = torch.cuda.device_count()
     
-    if args.gpus > 0:
-        accelerator = 'gpu'
-        devices = args.gpus
-        strategy = 'ddp' if devices > 1 else 'auto'
-    else:
-        accelerator = 'cpu'
-        devices = 1
-        strategy = 'auto'
-
-    print(f"Using accelerator: {accelerator}, devices: {devices}, strategy: {strategy}")
+    accelerator = 'gpu' if args.gpus > 0 else 'cpu'
+    devices = args.gpus if args.gpus > 0 else 1
+    strategy = 'ddp' if args.gpus > 1 else 'auto'
 
     trainer = pl.Trainer(
         callbacks=callbacks,
@@ -246,17 +187,21 @@ def main(args):
         accelerator=accelerator,
         devices=devices,
         strategy=strategy,
-        enable_progress_bar=False
+        enable_progress_bar=True
     )
 
-    trainer.fit(task, train_loader, val_loader)
+    # Training and testing
+    trainer.fit(task, custom_data)
     
-    # Test the model
-    trainer.test(task, test_loader)
+    # Run test on best model
+    print("\nStarting test phase...")
+    trainer.test(dataloaders=custom_data.test_dataloader(), ckpt_path='best')
 
+    # Save model
     torch.save(task, os.path.join(args.output_dir, args.model_save_path))
     print("Model saved successfully.")
 
 if __name__ == "__main__":
     args = parse_args()
     main(args)
+
