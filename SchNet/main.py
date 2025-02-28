@@ -143,6 +143,7 @@ def main(args):
         accelerator=accelerator,
         devices=devices,
         strategy=strategy,
+        enable_progress_bar=False
     )
 
     trainer.fit(task, train_loader, val_loader)
