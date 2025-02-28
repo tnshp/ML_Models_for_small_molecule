@@ -20,10 +20,10 @@ from schnetpack.nn import cutoff, radial
 
 def parse_args():
     parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
-    parser.add_argument("--output_dir", type=str, default="./forcetut", help="Directory for output files")
+    parser.add_argument("--output_dir", type=str,  help="Directory for output files")
+    parser.add_argument("--db_file", type=str,  help="Path to the database file")
     parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
     
-    parser.add_argument("--db_file", type=str, default='md\Azobenzene.db', help="Path to the database file")
     parser.add_argument("--batch_size", type=int, default=24, help="Batch size for training")
     parser.add_argument("--cutoff", type=float, default=5.0, help="Cutoff distance for interactions")
     parser.add_argument("--n_atom_basis", type=int, default=128, help="Number of features to describe atomic environments")
