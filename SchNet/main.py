@@ -59,6 +59,65 @@ class ForceTask(spk.task.AtomisticTask):
         self.test_mae.reset()
         self.test_rmse.reset()
 
+class ForceEnergyTask(spk.task.AtomisticTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.train_force_mae = torchmetrics.MeanAbsoluteError()
+        self.train_force_rmse = torchmetrics.MeanSquaredError(squared=False)
+        self.train_energy_mae = torchmetrics.MeanAbsoluteError()
+        self.train_energy_rmse = torchmetrics.MeanSquaredError(squared=False)
+        self.test_force_mae = torchmetrics.MeanAbsoluteError()
+        self.test_force_rmse = torchmetrics.MeanSquaredError(squared=False)
+        self.test_energy_mae = torchmetrics.MeanAbsoluteError()
+        self.test_energy_rmse = torchmetrics.MeanSquaredError(squared=False)
+
+    def training_step(self, batch, batch_idx):
+        result = super().training_step(batch, batch_idx)
+        pred_forces = result['forces']
+        target_forces = batch['forces']
+        pred_energy = result['energy']
+        target_energy = batch['energy']
+        
+        self.train_force_mae(pred_forces, target_forces)
+        self.train_force_rmse(pred_forces, target_forces)
+        self.train_energy_mae(pred_energy, target_energy)
+        self.train_energy_rmse(pred_energy, target_energy)
+        return result
+
+    def on_train_epoch_end(self):
+        print(f"Train Force MAE: {self.train_force_mae.compute():.4f}")
+        print(f"Train Force RMSE: {self.train_force_rmse.compute():.4f}")
+        print(f"Train Energy MAE: {self.train_energy_mae.compute():.4f}")
+        print(f"Train Energy RMSE: {self.train_energy_rmse.compute():.4f}")
+        self.train_force_mae.reset()
+        self.train_force_rmse.reset()
+        self.train_energy_mae.reset()
+        self.train_energy_rmse.reset()
+
+    def test_step(self, batch, batch_idx):
+        result = super().test_step(batch, batch_idx)
+        pred_forces = result['forces']
+        target_forces = batch['forces']
+        pred_energy = result['energy']
+        target_energy = batch['energy']
+        
+        self.test_force_mae(pred_forces, target_forces)
+        self.test_force_rmse(pred_forces, target_forces)
+        self.test_energy_mae(pred_energy, target_energy)
+        self.test_energy_rmse(pred_energy, target_energy)
+        return result
+
+    def on_test_epoch_end(self):
+        print(f"Test Force MAE: {self.test_force_mae.compute():.4f}")
+        print(f"Test Force RMSE: {self.test_force_rmse.compute():.4f}")
+        print(f"Test Energy MAE: {self.test_energy_mae.compute():.4f}")
+        print(f"Test Energy RMSE: {self.test_energy_rmse.compute():.4f}")
+        self.test_force_mae.reset()
+        self.test_force_rmse.reset()
+        self.test_energy_mae.reset()
+        self.test_energy_rmse.reset()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
     parser.add_argument("--db_file", type=str, required=True, help="Path to the database file")
@@ -76,7 +135,7 @@ def parse_args():
 
 def main(args):
     # Load dataset, focusing only on forces
-    dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
+    dataset = ASEAtomsData(args.db_file, load_properties=['forces', 'energy'])
     print(f"Total dataset length: {len(dataset)}")
 
     # Set num_train and calculate num_val and num_test
@@ -91,7 +150,7 @@ def main(args):
         datapath=args.db_file,
         batch_size=args.batch_size,
         distance_unit='Ang',
-        property_units={'forces':'kcal/mol/Ang'},
+        property_units={'forces': 'kcal/mol/Ang', 'energy': 'kcal/mol'},
         num_train=args.num_train,
         num_val=args.num_val,
         num_test=args.num_test,
