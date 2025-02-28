@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument("--max_epochs", type=int, default=5, help="Maximum number of training epochs")
     
     parser.add_argument("--num_train", type=int, default=1000, help="Number of samples to use for training")
-    parser.add_argument("--gpus", type=int, default=-1, help="Number of GPUs to use (-1 for all available)")
+    parser.add_argument("--gpus", type=int, default=0, help="Number of GPUs to use (-1 for all available)")
     return parser.parse_args()
 
 def main(args):
@@ -123,15 +123,17 @@ def main(args):
     # Determine GPU usage
     if args.gpus == -1:
         args.gpus = torch.cuda.device_count()
-    
+
     if args.gpus > 0:
         accelerator = 'gpu'
         devices = args.gpus
+        strategy = 'ddp' if devices > 1 else 'auto'
     else:
         accelerator = 'cpu'
         devices = None
+        strategy = 'auto'
 
-    print(f"Using accelerator: {accelerator}, devices: {devices}")
+    print(f"Using accelerator: {accelerator}, devices: {devices}, strategy: {strategy}")
 
     trainer = pl.Trainer(
         callbacks=callbacks,
@@ -140,7 +142,7 @@ def main(args):
         max_epochs=args.max_epochs,
         accelerator=accelerator,
         devices=devices,
-        strategy='ddp' if devices and devices > 1 else None,  # Use DDP for multi-GPU training
+        strategy=strategy,
     )
 
     trainer.fit(task, train_loader, val_loader)
