@@ -20,9 +20,6 @@ def main():
     forces = data["forces"]
     energies = data["energies"]
 
-    print(forces)
-    print(energies)
-
     # Prepare data for ASEAtomsData
     atoms_list = []
     property_list = []

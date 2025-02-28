@@ -130,7 +130,7 @@ def main(args):
         strategy = 'ddp' if devices > 1 else 'auto'
     else:
         accelerator = 'cpu'
-        devices = None
+        devices = 1
         strategy = 'auto'
 
     print(f"Using accelerator: {accelerator}, devices: {devices}, strategy: {strategy}")
