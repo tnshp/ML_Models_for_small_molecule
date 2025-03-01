@@ -33,56 +33,6 @@ def parse_args():
     parser.add_argument("--gpus", type=int, default=0, help="Number of GPUs to use (-1 for all available)")
     return parser.parse_args()
 
-def test_model(model, test_loader, device):
-    model.eval()
-    
-    # Initialize metrics
-    energy_mae = torchmetrics.MeanAbsoluteError().to(device)
-    energy_mse = torchmetrics.MeanSquaredError().to(device)
-    forces_mae = torchmetrics.MeanAbsoluteError().to(device)
-    forces_mse = torchmetrics.MeanSquaredError().to(device)
-
-    with torch.enable_grad():  # Force gradient tracking even in eval mode
-        for batch in test_loader:
-            # Move data to device and ensure gradient tracking
-            batch = {k: v.to(device).requires_grad_(True) for k, v in batch.items()}
-            
-            try:
-                # Forward pass with gradient computation
-                predictions = model(batch)
-                
-                # Extract predictions and targets
-                pred_energy = predictions['energy']
-                true_energy = batch['energy']
-                
-                pred_forces = predictions['forces']
-                true_forces = batch['forces']
-
-                # Update metrics
-                energy_mae(pred_energy, true_energy)
-                energy_mse(pred_energy, true_energy)
-                forces_mae(pred_forces, true_forces)
-                forces_mse(pred_forces, true_forces)
-                
-            except RuntimeError as e:
-                if "requires grad but does not have a grad_fn" in str(e):
-                    # Handle potential type mismatch
-                    batch = {k: v.float() for k, v in batch.items()}  # Convert to float32
-                    predictions = model(batch)
-                else:
-                    raise e
-
-    # Calculate final metrics (same as before)
-    energy_rmse = torch.sqrt(energy_mse.compute())
-    forces_rmse = torch.sqrt(forces_mse.compute())
-
-    print("\nTest Results:")
-    print(f"Energy MAE: {energy_mae.compute().item():.4f} kcal/mol")
-    print(f"Energy RMSE: {energy_rmse.item():.4f} kcal/mol")
-    print(f"Forces MAE: {forces_mae.compute().item():.4f} kcal/mol/Å")
-    print(f"Forces RMSE: {forces_rmse.item():.4f} kcal/mol/Å")
-
-
 def main(args):
     # Load dataset, focusing only on forces
     dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
@@ -147,13 +97,19 @@ def main(args):
     output_forces = spk.task.ModelOutput(
         name='forces',
         loss_fn=torch.nn.MSELoss(),
-        loss_weight=1.0,
+        loss_weight=0.5,
+        metrics={"MAE": torchmetrics.MeanAbsoluteError()}
+    )
+    output_energy = spk.task.ModelOutput(
+        name='energy',
+        loss_fn=torch.nn.MSELoss(),
+        loss_weight=0.5,
         metrics={"MAE": torchmetrics.MeanAbsoluteError()}
     )
 
     task = spk.task.AtomisticTask(
         model=nnpot,
-        outputs=[output_forces],
+        outputs=[output_forces, output_energy],
         optimizer_cls=torch.optim.AdamW,
         optimizer_args={"lr": args.lr}
     )
