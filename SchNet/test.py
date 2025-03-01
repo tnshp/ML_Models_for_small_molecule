@@ -78,10 +78,6 @@ def main():
     predicted_energy =np.array(energy)
 
     # Flatten the forces to 2D (number of atoms x 3 for each atom's force vector)
-    print(all_forces)
-    print(predicted_forces)
-    print(all_forces.shape)
-    print(predicted_forces.shape)
     # all_forces = all_forces.reshape(-1, 3)
     # predicted_forces = predicted_forces.reshape(-1, 3)
 
