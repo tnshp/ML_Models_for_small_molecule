@@ -33,6 +33,56 @@ def parse_args():
     parser.add_argument("--gpus", type=int, default=0, help="Number of GPUs to use (-1 for all available)")
     return parser.parse_args()
 
+def test_model(model, test_loader, device):
+    model.eval()
+    
+    # Initialize metrics
+    energy_mae = torchmetrics.MeanAbsoluteError().to(device)
+    energy_mse = torchmetrics.MeanSquaredError().to(device)
+    forces_mae = torchmetrics.MeanAbsoluteError().to(device)
+    forces_mse = torchmetrics.MeanSquaredError().to(device)
+
+    with torch.enable_grad():  # Force gradient tracking even in eval mode
+        for batch in test_loader:
+            # Move data to device and ensure gradient tracking
+            batch = {k: v.to(device).requires_grad_(True) for k, v in batch.items()}
+            
+            try:
+                # Forward pass with gradient computation
+                predictions = model(batch)
+                
+                # Extract predictions and targets
+                pred_energy = predictions['energy']
+                true_energy = batch['energy']
+                
+                pred_forces = predictions['forces']
+                true_forces = batch['forces']
+
+                # Update metrics
+                energy_mae(pred_energy, true_energy)
+                energy_mse(pred_energy, true_energy)
+                forces_mae(pred_forces, true_forces)
+                forces_mse(pred_forces, true_forces)
+                
+            except RuntimeError as e:
+                if "requires grad but does not have a grad_fn" in str(e):
+                    # Handle potential type mismatch
+                    batch = {k: v.float() for k, v in batch.items()}  # Convert to float32
+                    predictions = model(batch)
+                else:
+                    raise e
+
+    # Calculate final metrics (same as before)
+    energy_rmse = torch.sqrt(energy_mse.compute())
+    forces_rmse = torch.sqrt(forces_mse.compute())
+
+    print("\nTest Results:")
+    print(f"Energy MAE: {energy_mae.compute().item():.4f} kcal/mol")
+    print(f"Energy RMSE: {energy_rmse.item():.4f} kcal/mol")
+    print(f"Forces MAE: {forces_mae.compute().item():.4f} kcal/mol/Å")
+    print(f"Forces RMSE: {forces_rmse.item():.4f} kcal/mol/Å")
+
+
 def main(args):
     # Load dataset, focusing only on forces
     dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
@@ -40,7 +90,8 @@ def main(args):
 
     # Set num_train and calculate num_val
     args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
-    args.num_val = len(dataset) - args.num_train
+    args.num_val = int(0.2 * args.num_train) 
+    args.num_test = len(dataset) - args.num_train - args.num_val 
 
     print(f"Using {args.num_train} samples for training and {args.num_val} samples for validation.")
 
@@ -52,6 +103,7 @@ def main(args):
         property_units={'forces':'kcal/mol/Ang'},
         num_train=args.num_train,
         num_val=args.num_val,
+        num_test= args.num_test,
         transforms=[
             trn.ASENeighborList(cutoff=args.cutoff),
             trn.CastTo32()
@@ -66,6 +118,7 @@ def main(args):
 
     train_loader = custom_data.train_dataloader()
     val_loader = custom_data.val_dataloader()
+    test_loader = custom_data.test_dataloader()
 
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Validation dataset length: {len(val_loader.dataset)}")
@@ -138,14 +191,20 @@ def main(args):
         max_epochs=args.max_epochs,
         accelerator=accelerator,
         devices=devices,
-        strategy='ddp' if devices and devices > 1 else None,  # Use DDP for multi-GPU training
+        strategy='ddp' if devices and devices > 1 else 'auto',  # Use DDP for multi-GPU training
         enable_progress_bar=False
     )
+    
 
     trainer.fit(task, train_loader, val_loader)
 
+    
     torch.save(task, os.path.join(args.output_dir, args.model_save_path))
     print("Model saved successfully.")
+
+    print("\nStarting testing...")
+    test_model(task.model, test_loader, args.device)
+
 
 if __name__ == "__main__":
     args = parse_args()
