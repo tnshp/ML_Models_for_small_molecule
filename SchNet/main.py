@@ -43,7 +43,7 @@ def main(args):
     args.num_val = int(0.2 * args.num_train) 
     args.num_test = len(dataset) - args.num_train - args.num_val 
 
-    print(f"Using {args.num_train} samples for training and {args.num_val} samples for validation.")
+    print(f"Using {args.num_train} training sample and {args.num_val} validation for {args.max_epochs} epochs")
 
     # Use the file path directly for AtomsDataModule
     custom_data = spk.data.AtomsDataModule(
