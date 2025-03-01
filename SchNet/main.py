@@ -203,7 +203,7 @@ def main(args):
     print("Model saved successfully.")
 
     print("\nStarting testing...")
-    test_model(task.model, test_loader, args.device)
+    test_model(task.model, test_loader, 'cpu' if args.gpus == 0 else 'gpu')
 
 
 if __name__ == "__main__":
