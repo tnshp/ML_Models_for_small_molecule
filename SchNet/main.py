@@ -17,41 +17,78 @@ from pytorch_lightning.callbacks.progress import TQDMProgressBar
 
 from schnetpack.nn import cutoff, radial
 
-class MetricTracker(pl.Callback):
-    def __init__(self):
-        super().__init__()
-        self.metrics = {
-            'train': {'forces_mae': [], 'forces_rmse': [], 'energy_mae': [], 'energy_rmse': []},
-            'val': {'forces_mae': [], 'forces_rmse': [], 'energy_mae': [], 'energy_rmse': []},
-            'test': {'forces_mae': [], 'forces_rmse': [], 'energy_mae': [], 'energy_rmse': []}
-        }
+class ForceEnergyTask(spk.task.AtomisticTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Initialize metrics for validation
+        self.val_forces_mae = torchmetrics.MeanAbsoluteError()
+        self.val_forces_rmse = torchmetrics.MeanSquaredError(squared=False)
+        self.val_energy_mae = torchmetrics.MeanAbsoluteError()
+        self.val_energy_rmse = torchmetrics.MeanSquaredError(squared=False)
+        
+        # Initialize metrics for testing
+        self.test_forces_mae = torchmetrics.MeanAbsoluteError()
+        self.test_forces_rmse = torchmetrics.MeanSquaredError(squared=False)
+        self.test_energy_mae = torchmetrics.MeanAbsoluteError()
+        self.test_energy_rmse = torchmetrics.MeanSquaredError(squared=False)
 
-    def on_validation_epoch_end(self, trainer, pl_module):
-        self._log_metrics('val', pl_module)
+    def validation_step(self, batch, batch_idx):
+        results = super().validation_step(batch, batch_idx)
+        preds = self.model(batch)
+        
+        # Update validation metrics
+        self.val_forces_mae(preds['forces'], batch['forces'])
+        self.val_forces_rmse(preds['forces'], batch['forces'])
+        self.val_energy_mae(preds['energy'], batch['energy'])
+        self.val_energy_rmse(preds['energy'], batch['energy'])
+        
+        return results
 
-    def on_test_epoch_end(self, trainer, pl_module):
-        self._log_metrics('test', pl_module)
+    def on_validation_epoch_end(self):
+        # Log validation metrics
+        self.log('val_forces_mae', self.val_forces_mae.compute(), prog_bar=True)
+        self.log('val_forces_rmse', self.val_forces_rmse.compute())
+        self.log('val_energy_mae', self.val_energy_mae.compute(), prog_bar=True)
+        self.log('val_energy_rmse', self.val_energy_rmse.compute())
+        
+        # Reset metrics
+        self.val_forces_mae.reset()
+        self.val_forces_rmse.reset()
+        self.val_energy_mae.reset()
+        self.val_energy_rmse.reset()
 
-    def _log_metrics(self, stage, pl_module):
-        metrics = {
-            'forces_mae': pl_module.val_forces_mae.compute(),
-            'forces_rmse': pl_module.val_forces_rmse.compute(),
-            'energy_mae': pl_module.val_energy_mae.compute(),
-            'energy_rmse': pl_module.val_energy_rmse.compute()
-        }
-        for name, value in metrics.items():
-            self.metrics[stage][name].append(value.item())
-            pl_module.log(f"{stage}_{name}", value, prog_bar=True)
-            
-        print(f"\n{stage.capitalize()} Metrics:")
-        print(f"Forces MAE: {metrics['forces_mae']:.4f}, RMSE: {metrics['forces_rmse']:.4f}")
-        print(f"Energy MAE: {metrics['energy_mae']:.4f}, RMSE: {metrics['energy_rmse']:.4f}")
+    def test_step(self, batch, batch_idx):
+        results = super().test_step(batch, batch_idx)
+        preds = self.model(batch)
+        
+        # Update test metrics
+        self.test_forces_mae(preds['forces'], batch['forces'])
+        self.test_forces_rmse(preds['forces'], batch['forces'])
+        self.test_energy_mae(preds['energy'], batch['energy'])
+        self.test_energy_rmse(preds['energy'], batch['energy'])
+        
+        return results
 
-class CustomProgressBar(TQDMProgressBar):
-    def init_validation_tqdm(self):
-        bar = super().init_validation_tqdm()
-        bar.disable = True
-        return bar
+    def on_test_epoch_end(self):
+        # Log test metrics
+        self.log('test_forces_mae', self.test_forces_mae.compute(), prog_bar=True)
+        self.log('test_forces_rmse', self.test_forces_rmse.compute())
+        self.log('test_energy_mae', self.test_energy_mae.compute(), prog_bar=True)
+        self.log('test_energy_rmse', self.test_energy_rmse.compute())
+        
+        # Print formatted metrics
+        print(f"\nTest Metrics:")
+        print(f"Forces MAE: {self.test_forces_mae.compute():.4f}")
+        print(f"Forces RMSE: {self.test_forces_rmse.compute():.4f}")
+        print(f"Energy MAE: {self.test_energy_mae.compute():.4f}")
+        print(f"Energy RMSE: {self.test_energy_rmse.compute():.4f}")
+        
+        # Reset metrics
+        self.test_forces_mae.reset()
+        self.test_forces_rmse.reset()
+        self.test_energy_mae.reset()
+        self.test_energy_rmse.reset()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
