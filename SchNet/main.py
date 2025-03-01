@@ -139,6 +139,7 @@ def main(args):
         accelerator=accelerator,
         devices=devices,
         strategy='ddp' if devices and devices > 1 else None,  # Use DDP for multi-GPU training
+        enable_progress_bar=False
     )
 
     trainer.fit(task, train_loader, val_loader)
