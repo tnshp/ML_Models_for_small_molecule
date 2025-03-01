@@ -151,8 +151,6 @@ def main(args):
         metrics={"MAE": torchmetrics.MeanAbsoluteError()}
     )
 
-    print("Output forces: \n", output_forces)
-
     task = spk.task.AtomisticTask(
         model=nnpot,
         outputs=[output_forces],
