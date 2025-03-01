@@ -58,7 +58,7 @@ def main():
         # Extract the predicted forces and energy
 
         # For forces, do the same
-        predicted_enrgy = results["energy"].detach().cpu().numpy()
+        predicted_energy = results["energy"].detach().cpu().numpy()
         predicted_force = results["forces"].detach().cpu().numpy()
         true_energy = structure["energy"]  
         true_force = structure["forces"]  
@@ -68,7 +68,7 @@ def main():
         all_energy.append(true_energy)
 
         forces.append(predicted_force)  # Append directly as it's already a NumPy arr
-        energy.append(true_energy)
+        energy.append(predicted_energy)
 
     # Convert the lists to NumPy arrays
     all_forces = np.array(all_forces)
