@@ -14,7 +14,7 @@ import schnetpack.transform as trn
 from schnetpack.data import ASEAtomsData
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from schnetpack.nn import cutoff, radial
 
@@ -118,7 +118,8 @@ def main(args):
             monitor="val_loss",
             mode="min",
             save_top_k=1
-        )
+        ),
+        EarlyStopping(monitor="val_loss", mode="min")
     ]
 
     # Determine GPU usage
@@ -142,7 +143,7 @@ def main(args):
         accelerator=accelerator,
         devices=devices,
         strategy='ddp' if devices and devices > 1 else 'auto',  # Use DDP for multi-GPU training
-        enable_progress_bar=True
+        enable_progress_bar=False
     )
     
 
