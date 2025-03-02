@@ -63,14 +63,21 @@ parser.add_argument("-n","--npz_file_path", type=str, help="npz file path")
 # Parse arguments
 args = parser.parse_args()
 
-
+ 
 # Parse the XYZ file
 positions, atomic_numbers, forces, energies = parse_xyz_file(args.xyz_file_path)
+energies = energies / 4184 #joule to kcal
 
 # print(forces)
-# print(energies)
+# print(energies) 
 
 # Save data to NPZ file
+print(energies[0:5])
+# print(forces[0:5])
+print(forces.mean())
+print(positions[0:5])
+print(atomic_numbers[0:5])
+
 np.savez(args.npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
 
 print(f"Data saved to {args.npz_file_path}")

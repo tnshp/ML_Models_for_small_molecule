@@ -97,19 +97,19 @@ def main(args):
     output_forces = spk.task.ModelOutput(
         name='forces',
         loss_fn=torch.nn.MSELoss(),
-        loss_weight=0.5,
+        loss_weight=0.7,
         metrics={"MAE": torchmetrics.MeanAbsoluteError()}
     )
     output_energy = spk.task.ModelOutput(
         name='energy',
         loss_fn=torch.nn.MSELoss(),
-        loss_weight=0.5,
+        loss_weight=0.3,
         metrics={"MAE": torchmetrics.MeanAbsoluteError()}
     )
 
     task = spk.task.AtomisticTask(
         model=nnpot,
-        outputs=[output_forces, output_energy],
+        outputs=[output_energy, output_forces],
         optimizer_cls=torch.optim.AdamW,
         optimizer_args={"lr": args.lr}
     )
@@ -146,7 +146,7 @@ def main(args):
         accelerator=accelerator,
         devices=devices,
         strategy='ddp' if devices and devices > 1 else 'auto',  # Use DDP for multi-GPU training
-        enable_progress_bar=False
+        enable_progress_bar=True
     )
     
 

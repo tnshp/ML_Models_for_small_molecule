@@ -35,7 +35,7 @@ def main():
         atoms_list.append(atoms)
         property_list.append(properties)
 
-    print('Properties:', property_list[0])
+    # print('Properties:', property_list[0])
 
     # Remove the existing database file if it exists
     if os.path.exists(args.output_file):
