@@ -40,9 +40,7 @@ def main(args):
 
     # Set num_train and calculate num_val
     args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
-    args.num_val = int(0.2 * args.num_train) 
-    args.num_test = len(dataset) - args.num_train - args.num_val 
-
+    args.num_val = len(dataset) - args.num_train
     print(f"Using {args.num_train} training sample and {args.num_val} validation for {args.max_epochs} epochs")
 
     # Use the file path directly for AtomsDataModule
@@ -53,7 +51,6 @@ def main(args):
         property_units={'forces':'kcal/mol/Ang'},
         num_train=args.num_train,
         num_val=args.num_val,
-        num_test= args.num_test,
         transforms=[
             trn.ASENeighborList(cutoff=args.cutoff),
             trn.CastTo32()
@@ -68,7 +65,6 @@ def main(args):
 
     train_loader = custom_data.train_dataloader()
     val_loader = custom_data.val_dataloader()
-    test_loader = custom_data.test_dataloader()
 
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Validation dataset length: {len(val_loader.dataset)}")
