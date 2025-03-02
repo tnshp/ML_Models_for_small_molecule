@@ -94,13 +94,13 @@ def main(args):
     output_forces = spk.task.ModelOutput(
         name='forces',
         loss_fn=torch.nn.MSELoss(),
-        loss_weight=0.7,
+        loss_weight=0.3,
         metrics={"MAE": torchmetrics.MeanAbsoluteError()}
     )
     output_energy = spk.task.ModelOutput(
         name='energy',
         loss_fn=torch.nn.MSELoss(),
-        loss_weight=0.3,
+        loss_weight=0.7,
         metrics={"MAE": torchmetrics.MeanAbsoluteError()}
     )
 
