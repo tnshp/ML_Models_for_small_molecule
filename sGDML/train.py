@@ -10,10 +10,8 @@ parser.add_argument("-s","--save", type=str, help="model save path")
 parser.add_argument("-n","--n_train", default=200, type=int)
 
 parser.add_argument(
-    '-e',
     '--use_energy',
     action='store_true',
-    dest='use energy',
     help='use energy for training',
 )
 
