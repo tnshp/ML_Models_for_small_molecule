@@ -174,7 +174,7 @@ else:  # legacy non-standard XYZ format
 
         E = E/4181
         F = F/4184
-print(E)
+# print(E)
 # Base variables contained in every model file.
 base_vars = {
     'type': 'd',
