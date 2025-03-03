@@ -172,7 +172,9 @@ else:  # legacy non-standard XYZ format
     with open(dataset.name) as f:
         R, z, E, F = read_nonstd_ext_xyz(f)
 
-
+        E = E/4181
+        F = F/4184
+print(E)
 # Base variables contained in every model file.
 base_vars = {
     'type': 'd',
