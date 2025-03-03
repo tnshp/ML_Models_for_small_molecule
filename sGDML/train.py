@@ -29,7 +29,7 @@ modified_data = {key: dataset[key] for key in dataset}
 
 # Normalize energy
 modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
-gdml_train = GDMLTrain()
+gdml_train = GDMLTrain(use_torch=True)
 
 if args.use_energy:
     task = gdml_train.create_task(
@@ -50,10 +50,10 @@ else:
             valid_dataset=dataset, 
             n_valid=2000,
             sig=20, 
-            use_sym=True,
+            use_sym=True,  #sGDML
             lam=1e-10,
             use_E_cstr=False,
-            use_E=False  # Focus only on energy)
+            use_E=False 
     ) 
 
 model = gdml_train.train(task)
