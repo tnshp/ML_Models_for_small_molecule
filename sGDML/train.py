@@ -33,17 +33,30 @@ modified_data = {key: dataset[key] for key in dataset}
 modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
 gdml_train = GDMLTrain()
 
-task = gdml_train.create_task(
-        modified_data, 
-        n_train,
-        valid_dataset=dataset, 
-        n_valid=2000,
-        sig=20, 
-        use_sym=True,
-        lam=1e-10,
-        use_E_cstr=args.use_energy,
-        use_E=args.use_energy  # Focus only on energy)
-) 
+if args.use_energy:
+    task = gdml_train.create_task(
+            modified_data, 
+            n_train,
+            valid_dataset=dataset, 
+            n_valid=2000,
+            sig=20, 
+            use_sym=True,
+            lam=1e-10,
+            use_E_cstr=True,
+            use_E=True  # Focus only on energy)
+    ) 
+else:
+    task = gdml_train.create_task(
+            modified_data, 
+            n_train,
+            valid_dataset=dataset, 
+            n_valid=2000,
+            sig=20, 
+            use_sym=True,
+            lam=1e-10,
+            use_E_cstr=False,
+            use_E=False  # Focus only on energy)
+    ) 
 
 model = gdml_train.train(task)
 
