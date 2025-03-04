@@ -66,8 +66,7 @@ args = parser.parse_args()
  
 # Parse the XYZ file
 positions, atomic_numbers, forces, energies = parse_xyz_file(args.xyz_file_path)
-energies = energies / 4184 #joule to kcal
-forces = forces / 4184  
+energies = energies - np.min(energies) #joule to kcal
 
 # print(forces)
 # print(energies) 
