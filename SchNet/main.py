@@ -42,7 +42,7 @@ def main(args):
 
     # Set num_train and calculate num_val
     args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
-    args.num_val = len(dataset) - args.num_train
+    args.num_val = 1000
     print(f"Using {args.num_train} training sample and {args.num_val} validation for {args.max_epochs} epochs")
 
     # Use the file path directly for AtomsDataModule
@@ -124,7 +124,7 @@ def main(args):
     ]
     if args.early_stopping:
         callbacks.append(
-            EarlyStopping(monitor="val_loss", mode="min", patience=5)
+            EarlyStopping(monitor="val_loss", mode="min", patience=4)
         )
 
     # Determine GPU usage

@@ -10,6 +10,7 @@ parser.add_argument("-s","--save", type=str, help="model save path")
 parser.add_argument("-n","--n_train", default=200, type=int)
 
 parser.add_argument(
+    '-e',
     '--use_energy',
     action='store_true',
     help='use energy for training',
@@ -24,11 +25,12 @@ n_train = args.n_train
 energy_mean = np.mean(dataset['E'])
 energy_std = np.std(dataset['E'])
 
+print("energy", dataset['E'])
 # Create a mutable dictionary from the read-only dataset
 modified_data = {key: dataset[key] for key in dataset}
 
 # Normalize energy
-modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
+# modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
 gdml_train = GDMLTrain(use_torch=True)
 
 if args.use_energy:

@@ -70,24 +70,24 @@ def parse_xyz_file(file_path):
     return np.array(positions), np.array(atomic_numbers), np.array(forces), np.array(energies)
         
 positions, atomic_numbers, forces, energies = parse_xyz_file(args.dataset)
-energies = energies 
+energies = energies - np.min(energies)
 forces = forces 
 
 energy_mean = np.mean(energies)
 energy_std = np.std(energies)
 
 # Normalize the energies from the test set
-energies = (energies - energy_mean) / energy_std
+# energies = (energies - energy_mean) / energy_std
 
-print(energies[0:5])
+# print(energies[0:5])
 # print(r.shape)
 # print(positions.shape)
 
 #Predict energy and forces using the GDML model
 predicted_energy, predicted_forces = gdml.predict(r)
-predicted_energy = (predicted_energy - np.mean(predicted_energy)) / np.std(predicted_energy)
-predicted_energy = np.expand_dims(predicted_energy, axis= 0)
-print(predicted_energy[0:5])
+# predicted_energy = (predicted_energy - np.mean(predicted_energy)) / np.std(predicted_energy)
+predicted_energy = predicted_energy.reshape(len(predicted_energy), 1)
+# print(predicted_energy[0:5])
 
 if predicted_forces.shape != forces.shape:
     M, N3 = predicted_forces.shape
