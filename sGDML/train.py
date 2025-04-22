@@ -26,7 +26,7 @@ n_train = args.n_train
 energy_mean = np.mean(dataset['E'])
 energy_std = np.std(dataset['E'])
 
-print("energy", dataset['E'])
+# print("energy", dataset['E'])
 # Create a mutable dictionary from the read-only dataset
 modified_data = {key: dataset[key] for key in dataset}
 
@@ -39,7 +39,7 @@ if args.use_energy:
             modified_data, 
             n_train,
             valid_dataset=dataset, 
-            n_valid=len(dataset) - n_train,
+            n_valid=len(dataset['E']) - n_train,
             sig=20, 
             use_sym=True,
             lam=1e-10,
@@ -51,7 +51,7 @@ else:
             modified_data, 
             n_train,
             valid_dataset=dataset, 
-            n_valid=len(dataset) - n_train,
+            n_valid=len(dataset['E']) - n_train,
             sig=20, 
             use_sym=True,  #sGDML
             lam=1e-10,
