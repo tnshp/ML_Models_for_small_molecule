@@ -12,7 +12,7 @@ parser.add_argument("-n","--n_train", default=200, type=int)
 parser.add_argument(
     '-e',
     '--use_energy',
-    dest='use energy',
+    dest='use_energy',
     action='store_true',
     help='use energy for training',
 )
