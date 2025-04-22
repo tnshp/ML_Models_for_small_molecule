@@ -39,7 +39,7 @@ if args.use_energy:
             modified_data, 
             n_train,
             valid_dataset=dataset, 
-            n_valid=2000,
+            n_valid=len(dataset) - n_train,
             sig=20, 
             use_sym=True,
             lam=1e-10,
@@ -51,7 +51,7 @@ else:
             modified_data, 
             n_train,
             valid_dataset=dataset, 
-            n_valid=2000,
+            n_valid=len(dataset) - n_train,
             sig=20, 
             use_sym=True,  #sGDML
             lam=1e-10,
