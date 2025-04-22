@@ -1,7 +1,14 @@
 import numpy as np 
+import matplotlib.pyplot as plt
 
-dataset = np.load("Glycine.npz")
+dataset = np.load("Simulation/NQ/NQ.npz")
 
-print(dataset.files)
+print(dataset.files) 
 for key in dataset.files:
     print(f'key: {key} \t\t shape: {dataset[key].shape}')
+
+print(dataset['F'][: ,0, 0].shape)
+plt.plot(dataset['F'][:,0, 0])
+plt.plot(dataset['F'][:,0, 1])
+plt.plot(dataset['F'][:,0, 2])
+# plt.plot(dataset['E'] - dataset['E'][-1])

@@ -13,6 +13,7 @@ parser.add_argument(
     '-e',
     '--use_energy',
     dest='use energy',
+    action='store_true',
     help='use energy for training',
 )
 
