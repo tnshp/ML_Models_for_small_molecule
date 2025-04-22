@@ -54,31 +54,7 @@ def parse_xyz_file(file_path):
     
     return np.array(positions), np.array(atomic_numbers), np.array(forces), np.array(energies)
 
-
-parser = argparse.ArgumentParser(description="A simple script that to convert xyz to npz format")
-
-parser.add_argument("-x","--xyz_file_path", type=str, help="xyz file path")
-parser.add_argument("-n","--npz_file_path", type=str, help="npz file path")
-
-# Parse arguments
-args = parser.parse_args()
-
- 
-# Parse the XYZ file
-positions, atomic_numbers, forces, energies = parse_xyz_file(args.xyz_file_path)
-energies = energies - np.min(energies) #joule to kcal
-
-# print(forces)
-# print(energies) 
-
-# Save data to NPZ file
-print(energies[0:5])
-# print(forces[0:5])
-print(forces.mean())
-print(positions[0:5])
-print(atomic_numbers[0:5])
-
-np.savez(args.npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
-
-print(f"Data saved to {args.npz_file_path}")
-
+if __name__ == "__main__":
+    D = parse_xyz_file('Datasets/Glycine.xyz')
+    print(D)
+    print(len(D))

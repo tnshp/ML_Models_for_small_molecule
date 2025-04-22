@@ -2,8 +2,9 @@ import os
 import torch
 import torchmetrics
 import pytorch_lightning as pl
-
+import argparse
 import sys
+
 sys.path.insert(0, 'src\schnetpack')
 
 import schnetpack as spk
@@ -13,115 +14,151 @@ import schnetpack.transform as trn
 from schnetpack.data import ASEAtomsData
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-# Import the necessary components from schnetpack.nn
 from schnetpack.nn import cutoff, radial
 
-# Load dataset, focusing only on forces
-db_file = 'md\Azobenzene.db'  # Ensure the correct path
-dataset = ASEAtomsData(db_file, load_properties=['forces'])
+def parse_args():
+    parser = argparse.ArgumentParser(description="SchNetPack Force Prediction")
+    parser.add_argument("--db_file", type=str, required=True, help="Path to the database file")
+    parser.add_argument("--output_dir", type=str, required=True, help="Directory for output files")
+    parser.add_argument("--batch_size", type=int, default=24, help="Batch size for training")
+    parser.add_argument("--cutoff", type=float, default=5.0, help="Cutoff distance for interactions")
+    parser.add_argument("--n_atom_basis", type=int, default=128, help="Number of features to describe atomic environments")
+    parser.add_argument("--n_interactions", type=int, default=6, help="Number of interaction blocks")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--max_epochs", type=int, default=5, help="Maximum number of training epochs")
+    parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
+    parser.add_argument("--num_train", type=int, default=1000, help="Number of samples to use for training")
+    parser.add_argument("--gpus", type=int, default=0, help="Number of GPUs to use (-1 for all available)")
+    parser.add_argument("--early_stopping", action="store_true", help="enable early stopping")
+    parser.add_argument("--force_weight", type=int, default=0.5, help="force")
+    return parser.parse_args()
 
-# Check dataset length
-print(f"Dataset length: {len(dataset)}")
+def main(args):
+    # Load dataset, focusing only on forces
+    dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
+    print(f"Total dataset length: {len(dataset)}")
 
-# Use the file path directly for AtomsDataModule
-custom_data = spk.data.AtomsDataModule(
-    datapath=db_file,  # Pass the file path, not the dataset object
-    batch_size=24,  # Ensure this matches with the batch size in DataLoader
-    distance_unit='Ang',
-    property_units={'forces':'kcal/mol/Ang'},
-    num_train=int(len(dataset)*0.8),  # Properly cast to int
-    num_val=int(len(dataset)*0.2),  # Properly cast to int
-    transforms=[
-        trn.ASENeighborList(cutoff=5.),
-        trn.CastTo32()
-    ],
-    num_workers=0,  # Number of worker subprocesses for data loading
-    pin_memory=False,  # Pin memory is unnecessary when not using GPU
-    split_file=None  # Ensure that no split file is used
-)
+    # Set num_train and calculate num_val
+    args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
+    args.num_val = 1000
+    print(f"Using {args.num_train} training sample and {args.num_val} validation for {args.max_epochs} epochs")
 
-# Prepare and set up data
-custom_data.prepare_data()
-custom_data.setup()
-
-# Access data loaders
-train_loader = custom_data.train_dataloader()
-val_loader = custom_data.val_dataloader()
-
-# Check the length of the dataset to confirm the split
-print(f"Training dataset length: {len(train_loader.dataset)}")
-print(f"Validation dataset length: {len(val_loader.dataset)}")
-
-# Define SchNet representation and model
-cutoff_fn = cutoff.CosineCutoff(cutoff=5.0)
-radial_basis = radial.GaussianRBF(cutoff=5.0, n_rbf=50)
-
-schnet = rep.SchNet(
-    n_atom_basis=128,
-    n_interactions=6,
-    radial_basis=radial_basis,
-    cutoff_fn=cutoff_fn
-)
-
-# Pairwise distance module
-pairwise_distance = atm.PairwiseDistances()
-
-# Output module only for forces (no energy)
-# Modify the forces module to predict energy
-pred_forces = atm.Forces(energy_key='energy', force_key='forces')
-pred_energy = atm.Atomwise(n_in=128, output_key='energy')
-
-# Assemble model with both energy and forces
-nnpot = spk.model.NeuralNetworkPotential(
-    representation=schnet,
-    input_modules=[pairwise_distance],
-    output_modules=[pred_energy, pred_forces],  # Include both energy and forces
-    postprocessors=[trn.CastTo64()]
-)
-
-# Define loss function and metric only for forces
-output_forces = spk.task.ModelOutput(
-    name='forces',
-    loss_fn=torch.nn.MSELoss(),
-    loss_weight=1.0,  # 100% focus on forces
-    metrics={"MAE": torchmetrics.MeanAbsoluteError()}
-)
-
-print("Output forces: \n", output_forces)
-
-# Assemble task, focusing only on forces
-task = spk.task.AtomisticTask(
-    model=nnpot,
-    outputs=[output_forces],
-    optimizer_cls=torch.optim.AdamW,
-    optimizer_args={"lr": 1e-3}
-)
-
-# Set up logger and checkpointing
-forcetut = "./forcetut"
-logger = pl.loggers.TensorBoardLogger(save_dir=forcetut)
-callbacks = [
-    ModelCheckpoint(
-        dirpath=os.path.join(forcetut, "checkpoints"),
-        filename="best_inference_model",
-        monitor="val_loss",
-        mode="min",
-        save_top_k=1
+    # Use the file path directly for AtomsDataModule
+    custom_data = spk.data.AtomsDataModule(
+        datapath=args.db_file,
+        batch_size=args.batch_size,
+        distance_unit='Ang',
+        property_units={'forces':'kcal/mol/Ang'},
+        num_train=args.num_train,
+        num_val=args.num_val,
+        transforms=[
+            trn.ASENeighborList(cutoff=args.cutoff),
+            trn.CastTo32()
+        ],
+        num_workers=4,  # Increased for better performance
+        pin_memory=True,  # Enable pin_memory for faster data transfer to GPU
+        split_file=None
     )
-]
 
-trainer = pl.Trainer(
-    callbacks=callbacks,
-    logger=logger,
-    default_root_dir=forcetut,
-    max_epochs=5,  # Adjust epochs as needed
-    accelerator='cpu',  # Use CPU instead of GPU
-)
+    custom_data.prepare_data()
+    custom_data.setup()
 
-trainer.fit(task, train_loader, val_loader)
-# After the trainer.fit(task, train_loader, val_loader) line
+    train_loader = custom_data.train_dataloader()
+    val_loader = custom_data.val_dataloader()
 
-torch.save(task, "trained_model.pth")
-print("Model saved successfully.")
+    print(f"Training dataset length: {len(train_loader.dataset)}")
+    print(f"Validation dataset length: {len(val_loader.dataset)}")
+
+    cutoff_fn = cutoff.CosineCutoff(cutoff=args.cutoff)
+    radial_basis = radial.GaussianRBF(cutoff=args.cutoff, n_rbf=50)
+
+    schnet = rep.SchNet(
+        n_atom_basis=args.n_atom_basis,
+        n_interactions=args.n_interactions,
+        radial_basis=radial_basis,
+        cutoff_fn=cutoff_fn
+    )
+
+    pairwise_distance = atm.PairwiseDistances()
+    pred_forces = atm.Forces(energy_key='energy', force_key='forces')
+    pred_energy = atm.Atomwise(n_in=args.n_atom_basis, output_key='energy')
+
+    nnpot = spk.model.NeuralNetworkPotential(
+        representation=schnet,
+        input_modules=[pairwise_distance],
+        output_modules=[pred_energy, pred_forces],
+        postprocessors=[trn.CastTo64()]
+    )
+
+    output_forces = spk.task.ModelOutput(
+        name='forces',
+        loss_fn=torch.nn.MSELoss(),
+        loss_weight=args.force_weight,
+        metrics={"RMSE": torchmetrics.NormalizedRootMeanSquaredError()}
+    )
+    output_energy = spk.task.ModelOutput(
+        name='energy',
+        loss_fn=torch.nn.MSELoss(),
+        loss_weight=1 - args.force_weight,
+        metrics={"RMSE": torchmetrics.NormalizedRootMeanSquaredError()}
+    )
+
+    task = spk.task.AtomisticTask(
+        model=nnpot,
+        outputs=[output_energy, output_forces],
+        optimizer_cls=torch.optim.AdamW,
+        optimizer_args={"lr": args.lr}
+    )
+
+    logger = pl.loggers.TensorBoardLogger(save_dir=args.output_dir)
+    callbacks = [
+        ModelCheckpoint(
+            dirpath=os.path.join(args.output_dir, "checkpoints"),
+            filename="best_inference_model",
+            monitor="val_loss",
+            mode="min",
+            save_top_k=1
+        ),
+    ]
+    if args.early_stopping:
+        callbacks.append(
+            EarlyStopping(monitor="val_loss", mode="min", patience=4)
+        )
+
+    # Determine GPU usage
+    if args.gpus == -1:
+        args.gpus = torch.cuda.device_count()
+    
+    if args.gpus > 0:
+        accelerator = 'gpu'
+        devices = args.gpus
+    else:
+        accelerator = 'cpu'
+        devices = 1
+
+    print(f"Using accelerator: {accelerator}, devices: {devices}")
+
+    trainer = pl.Trainer(
+        callbacks=callbacks,
+        logger=logger,
+        default_root_dir=args.output_dir,
+        max_epochs=args.max_epochs,
+        accelerator=accelerator,
+        devices=devices,
+        strategy='ddp' if devices and devices > 1 else 'auto',  # Use DDP for multi-GPU training
+        enable_progress_bar=False
+    )
+    
+
+    trainer.fit(task, train_loader, val_loader)
+
+    
+    torch.save(task, os.path.join(args.output_dir, args.model_save_path))
+    print("Model saved successfully.")
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
