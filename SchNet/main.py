@@ -35,6 +35,25 @@ def parse_args():
     parser.add_argument("--force_weight", type=int, default=0.5, help="force")
     return parser.parse_args()
 
+from pytorch_lightning.callbacks import Callback
+
+class PrintLossEveryNEpochs(Callback):
+    def __init__(self, n=5):
+        super().__init__()
+        self.n = n
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        if (trainer.current_epoch + 1) % self.n == 0:
+            train_loss = trainer.callback_metrics.get('train_loss')
+            if train_loss is not None:
+                print(f"Epoch {trainer.current_epoch + 1}: Train Loss = {train_loss:.4f}")
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if (trainer.current_epoch + 1) % self.n == 0:
+            val_loss = trainer.callback_metrics.get('val_loss')
+            if val_loss is not None:
+                print(f"Epoch {trainer.current_epoch + 1}: Validation Loss = {val_loss:.4f}")
+
 def main(args):
     # Load dataset, focusing only on forces
     dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
@@ -84,7 +103,7 @@ def main(args):
     pairwise_distance = atm.PairwiseDistances()
     pred_forces = atm.Forces(energy_key='energy', force_key='forces')
     pred_energy = atm.Atomwise(n_in=args.n_atom_basis, output_key='energy')
-
+    
     nnpot = spk.model.NeuralNetworkPotential(
         representation=schnet,
         input_modules=[pairwise_distance],
@@ -121,7 +140,9 @@ def main(args):
             mode="min",
             save_top_k=1
         ),
+        PrintLossEveryNEpochs(n=5)  # <-- Add this line
     ]
+
     if args.early_stopping:
         callbacks.append(
             EarlyStopping(monitor="val_loss", mode="min", patience=4)

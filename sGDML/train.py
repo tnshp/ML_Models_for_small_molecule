@@ -31,7 +31,7 @@ energy_std = np.std(dataset['E'])
 modified_data = {key: dataset[key] for key in dataset}
 
 # Normalize energy
-# modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
+modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
 gdml_train = GDMLTrain(use_torch=True)
 
 if args.use_energy:
