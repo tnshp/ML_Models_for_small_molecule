@@ -6,6 +6,10 @@ from schnetpack.interfaces import SpkCalculator
 import argparse
 from ase.io import read
 
+from schnetpack.environment import ASEEnvironmentProvider
+from schnetpack.interfaces import SpkCalculator
+
+
 parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 parser.add_argument("-m","--model", type=str, help="model file path")
 parser.add_argument("-i","--initial_struct", type=str, help="Inital structure file path in xyz format")
@@ -13,18 +17,24 @@ parser.add_argument("-log","--log_dir", type=str, help="logging directory")
 
 args = parser.parse_args()
 
+# Define neighbor list environment provider
+neighbor_list = ASEEnvironmentProvider(cutoff=5.0)
 # Load the trained model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = torch.load(args.model, map_location='cpu')
 model.eval()
 
 # Define your initial atomic configuration
-# Replace this with your actual structure: NBD molecule
 atoms = read(args.initial_struct)
-# atoms = Atoms('C7H8', positions=[[...], [...], ...])  # Fill in with your coordinates
+
 
 # Attach the SchNet model as a calculator
-calc = SpkCalculator(model, energy='energy', forces='forces')
+calc = SpkCalculator(
+    model=model,
+    neighbor_list=neighbor_list,
+    energy='energy',       # These must match your training config
+    forces='forces',
+)
 atoms.set_calculator(calc)
 
 # Set the initial temperature (e.g., 300 K)
