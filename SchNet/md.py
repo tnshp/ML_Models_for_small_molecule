@@ -1,11 +1,8 @@
 import torch
-from ase import Atoms
 from ase.md.verlet import VelocityVerlet
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.units import fs, kB
-from schnetpack import AtomsData
-from schnetpack.interfaces import SpkCalculator
-from schnetpack.datasets import MD17  # Or your custom dataset
+from schnetpack.interfaces import SpkCalculator 
 
 parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 parser.add_argument("-m","--model", type=str, help="model file path")
