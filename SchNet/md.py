@@ -2,19 +2,20 @@ from schnetpack.md import Simulator, System
 from schnetpack.md.calculators import SchNetPackCalculator
 from schnetpack import AtomsData
 from ase.io import read
+import os
 import argparse
 
 parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 
 parser.add_argument("-m","--model", type=str, help="model file path")
-parser.add_argument("-i","--initial_struct", type=str, help="Inital structure file path")
+parser.add_argument("-i","--initial_struct", type=str, help="Inital structure file path in xyz format")
 parser.add_argument("-log","--log_dir", type=str, help="logging directory")
 # Parse arguments 
 args = parser.parse_args()
 
 
 # Load your trained model
-model_path = "trained_model.pth"  # Replace with your model path
+model_path = args.model  # Replace with your model path
 md_calculator = SchNetPackCalculator(
     model_path,
     device="cuda",  # Use "cpu" if no GPU
@@ -24,7 +25,7 @@ md_calculator = SchNetPackCalculator(
 )
 
 #intitial structure
-initial_structure = read("initial_structure.xyz")
+initial_structure = read(args.initial_struct)
 
 from schnetpack.md import LangevinSimulator
 from schnetpack.md.integrators import LangevinIntegrator
@@ -43,7 +44,7 @@ integrator = LangevinIntegrator(
 
 # Simulation hooks (logging)
 logger = DataLogger(
-    "md_logs.hdf5",
+    os.path.join(args.log_dir, "md_logs.hdf5"),
     buffer_size=100,
     data_streams=[
         md_system.get_energy_stream(),
