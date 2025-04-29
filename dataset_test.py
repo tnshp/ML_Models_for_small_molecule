@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 
-dataset = np.load("Simulation/NQ/NQ.npz")
+dataset = np.load("Simulation/BrClN-Q/BrClN-Q.npz")
 
 print(dataset.files) 
 for key in dataset.files:
