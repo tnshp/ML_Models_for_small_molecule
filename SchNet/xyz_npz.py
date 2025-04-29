@@ -72,11 +72,11 @@ energies = energies - np.min(energies) #joule to kcal
 # print(energies) 
 
 # Save data to NPZ file
-print(energies[0:5])
+# print(energies[0:5])
 # print(forces[0:5])
-print(forces.mean())
-print(positions[0:5])
-print(atomic_numbers[0:5])
+# print(forces.mean())
+# print(positions[0:5])
+# print(atomic_numbers[0:5])
 
 np.savez(args.npz_file_path, positions=positions, atomic_numbers=atomic_numbers, forces=forces, energies=energies)
 
