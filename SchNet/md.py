@@ -1,54 +1,65 @@
-from schnetpack.md import Simulator, System
+from schnetpack.md import Simulator, System, LangevinIntegrator
 from schnetpack.md.calculators import SchNetPackCalculator
-from schnetpack.md import LangevinSimulator
-from schnetpack.md.integrators import LangevinIntegrator
-from schnetpack.md.simulation_hooks import Checkpoint, DataLogger
+from schnetpack.md.neighborlist_md import NeighborListMD
+from schnetpack.md.simulation_hooks import LangevinThermostat, DataLogger
+from schnetpack.transform import ASENeighborList
+from schnetpack import Properties
 
+import torch
 from ase.io import read
 import torch
 import os
 import argparse
 
-parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 
+parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 parser.add_argument("-m","--model", type=str, help="model file path")
 parser.add_argument("-i","--initial_struct", type=str, help="Inital structure file path in xyz format")
 parser.add_argument("-log","--log_dir", type=str, help="logging directory")
-# Parse arguments 
-args = parser.parse_args()
 
+args = parser.parse_args()
+# 1. Load trained model and set device
+model_path = args.model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
-model = torch.load(args.model, map_location=device)
+model = torch.load(model_path, map_location=device)
 model = model.to(device)
 
-# Load your trained model
-model_path = args.model  # Replace with your model path
-md_calculator = SchNetPackCalculator(
-    model,
-    energy_key="energy",
-    force_key="forces",
-    required_properties=["energy", "forces"]
+# 2. Configure neighbor list for MD
+cutoff = 5.0  # Å (should match model training)
+cutoff_shell = 2.0  # Å
+md_neighborlist = NeighborListMD(
+    cutoff,
+    cutoff_shell,
+    ASENeighborList,
+    device=device
 )
 
-#intitial structure
+# 3. Set up calculator WITHOUT device argument
+md_calculator = SchNetPackCalculator(
+    model,
+    md_neighborlist,
+    energy_key=Properties.energy,
+    force_key=Properties.forces,
+    required_properties=[Properties.energy, Properties.forces]
+)
+
+# 4. Initialize system and simulator
 initial_structure = read(args.initial_struct)
-
-
-# System setup
 md_system = System()
 md_system.load_molecules(initial_structure)
 
-# Integrator (NVT ensemble)
 integrator = LangevinIntegrator(
     time_step=0.5,  # fs
     temperature=300,  # K
     friction=0.01  # 1/fs
 )
+thermostat = LangevinThermostat(
+    temperature=300,  # K
+    time_constant=100  # fs
+)
 
-# Simulation hooks (logging)
 logger = DataLogger(
-    os.path.join(args.log_dir, "md_logs.hdf5"),
+    "md_logs.hdf5",
     buffer_size=100,
     data_streams=[
         md_system.get_energy_stream(),
@@ -56,14 +67,12 @@ logger = DataLogger(
     ]
 )
 
-# Simulator
-md_simulator = LangevinSimulator(
+md_simulator = Simulator(
     system=md_system,
     integrator=integrator,
     calculator=md_calculator,
-    simulation_hooks=[logger],
-    step_count=10000  # Total MD steps
+    simulation_hooks=[thermostat, logger],
+    step_count=10000
 )
 
-print('Starting simulation ...')
 md_simulator.simulate()
