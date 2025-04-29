@@ -1,4 +1,5 @@
-from schnetpack.md import Simulator, System, LangevinIntegrator
+from schnetpack.md import Simulator, System
+from schnetpack.md.integrators import VelocityVerlet
 from schnetpack.md.calculators import SchNetPackCalculator
 from schnetpack.md.neighborlist_md import NeighborListMD
 from schnetpack.md.simulation_hooks import LangevinThermostat, DataLogger
@@ -48,18 +49,14 @@ initial_structure = read(args.initial_struct)
 md_system = System()
 md_system.load_molecules(initial_structure)
 
-integrator = LangevinIntegrator(
-    time_step=0.5,  # fs
-    temperature=300,  # K
-    friction=0.01  # 1/fs
-)
+integrator = VelocityVerlet(time_step=0.5)
 thermostat = LangevinThermostat(
     temperature=300,  # K
     time_constant=100  # fs
 )
 
 logger = DataLogger(
-    "md_logs.hdf5",
+    os.path.join(args.log_dir,"md_logs.hdf5"),
     buffer_size=100,
     data_streams=[
         md_system.get_energy_stream(),
