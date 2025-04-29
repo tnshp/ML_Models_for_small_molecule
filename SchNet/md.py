@@ -4,6 +4,7 @@ from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.units import fs, kB
 from schnetpack.interfaces import SpkCalculator 
 import argparse
+from ase.io import read
 
 parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 parser.add_argument("-m","--model", type=str, help="model file path")
