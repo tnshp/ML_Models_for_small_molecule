@@ -1,6 +1,11 @@
 from schnetpack.md import Simulator, System
 from schnetpack.md.calculators import SchNetPackCalculator
+from schnetpack.md import LangevinSimulator
+from schnetpack.md.integrators import LangevinIntegrator
+from schnetpack.md.simulation_hooks import Checkpoint, DataLogger
+
 from ase.io import read
+import torch
 import os
 import argparse
 
@@ -12,12 +17,15 @@ parser.add_argument("-log","--log_dir", type=str, help="logging directory")
 # Parse arguments 
 args = parser.parse_args()
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+model = torch.load(args.model, map_location=device)
+model = model.to(device)
 
 # Load your trained model
 model_path = args.model  # Replace with your model path
 md_calculator = SchNetPackCalculator(
-    model_path,
-    device="cuda",  # Use "cpu" if no GPU
+    model,
     energy_key="energy",
     force_key="forces",
     required_properties=["energy", "forces"]
@@ -26,9 +34,6 @@ md_calculator = SchNetPackCalculator(
 #intitial structure
 initial_structure = read(args.initial_struct)
 
-from schnetpack.md import LangevinSimulator
-from schnetpack.md.integrators import LangevinIntegrator
-from schnetpack.md.simulation_hooks import Checkpoint, DataLogger
 
 # System setup
 md_system = System()
