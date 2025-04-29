@@ -1,6 +1,5 @@
 from schnetpack.md import Simulator, System
 from schnetpack.md.calculators import SchNetPackCalculator
-from schnetpack.data import AtomsData
 from ase.io import read
 import os
 import argparse
@@ -61,4 +60,5 @@ md_simulator = LangevinSimulator(
     step_count=10000  # Total MD steps
 )
 
+print('Starting simulation ...')
 md_simulator.simulate()
