@@ -1,17 +1,11 @@
-from schnetpack.md import Simulator, System
-from schnetpack.md.integrators import VelocityVerlet
-from schnetpack.md.calculators import SchNetPackCalculator
-from schnetpack.md.neighborlist_md import NeighborListMD
-from schnetpack.md.simulation_hooks import LangevinThermostat, DataLogger
-from schnetpack.transform import ASENeighborList
-from schnetpack import Properties
-
 import torch
-from ase.io import read
-import torch
-import os
-import argparse
-
+from ase import Atoms
+from ase.md.verlet import VelocityVerlet
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+from ase.units import fs, kB
+from schnetpack import AtomsData
+from schnetpack.interfaces import SpkCalculator
+from schnetpack.datasets import MD17  # Or your custom dataset
 
 parser = argparse.ArgumentParser(description="Testing loop for sGDML")
 parser.add_argument("-m","--model", type=str, help="model file path")
@@ -19,57 +13,34 @@ parser.add_argument("-i","--initial_struct", type=str, help="Inital structure fi
 parser.add_argument("-log","--log_dir", type=str, help="logging directory")
 
 args = parser.parse_args()
-# 1. Load trained model and set device
-model_path = args.model
+
+# Load the trained model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = torch.load(model_path, map_location=device)
-model = model.to(device)
+model = torch.load(args.model, map_location='cpu')
+model.eval()
 
-# 2. Configure neighbor list for MD
-cutoff = 5.0  # Å (should match model training)
-cutoff_shell = 2.0  # Å
-md_neighborlist = NeighborListMD(
-    cutoff,
-    cutoff_shell,
-    ASENeighborList,
-    device=device
-)
+# Define your initial atomic configuration
+# Replace this with your actual structure: NBD molecule
+atoms = read(args.initial_struct)
+# atoms = Atoms('C7H8', positions=[[...], [...], ...])  # Fill in with your coordinates
 
-# 3. Set up calculator WITHOUT device argument
-md_calculator = SchNetPackCalculator(
-    model,
-    md_neighborlist,
-    energy_key=Properties.energy,
-    force_key=Properties.forces,
-    required_properties=[Properties.energy, Properties.forces]
-)
+# Attach the SchNet model as a calculator
+calc = SpkCalculator(model, energy='energy', forces='forces')
+atoms.set_calculator(calc)
 
-# 4. Initialize system and simulator
-initial_structure = read(args.initial_struct)
-md_system = System()
-md_system.load_molecules(initial_structure)
+# Set the initial temperature (e.g., 300 K)
+MaxwellBoltzmannDistribution(atoms, temperature_K=300)
 
-integrator = VelocityVerlet(time_step=0.5)
-thermostat = LangevinThermostat(
-    temperature=300,  # K
-    time_constant=100  # fs
-)
+# Set up the MD simulation (Verlet integrator)
+dyn = VelocityVerlet(atoms, dt=0.5 * fs)
 
-logger = DataLogger(
-    os.path.join(args.log_dir,"md_logs.hdf5"),
-    buffer_size=100,
-    data_streams=[
-        md_system.get_energy_stream(),
-        md_system.get_position_stream()
-    ]
-)
+# Define a simple logger
+def printenergy(a=atoms):
+    epot = a.get_potential_energy()
+    ekin = a.get_kinetic_energy()
+    print(f'Epot = {epot:.3f} eV, Ekin = {ekin:.3f} eV, Etot = {epot+ekin:.3f} eV')
 
-md_simulator = Simulator(
-    system=md_system,
-    integrator=integrator,
-    calculator=md_calculator,
-    simulation_hooks=[thermostat, logger],
-    step_count=10000
-)
+dyn.attach(printenergy, interval=10)
 
-md_simulator.simulate()
+# Run MD for 1000 steps
+dyn.run(1000)
