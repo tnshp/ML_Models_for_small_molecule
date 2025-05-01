@@ -1,68 +1,165 @@
-import argparse
-import torch
-from ase.io import read
-from ase.md.verlet import VelocityVerlet
-from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
-from ase.units import fs
-from ase.io.trajectory import Trajectory
-from schnetpack.interfaces import SpkCalculator
-from schnetpack.transform import ASENeighborList
 import os
+import torch
+import schnetpack as spk
+from schnetpack.md import UniformInit
+from schnetpack.md import System
+from schnetpack.md.integrators import VelocityVerlet
+from schnetpack.md.calculators import SchNetPackCalculator
+from schnetpack import properties
+from schnetpack.md import Simulator
+from schnetpack.md.simulation_hooks import LangevinThermostat
+from ase.io import read
+import argparse
 
-# Argument parser
-parser = argparse.ArgumentParser(description="Testing loop for sGDML")
+parser = argparse.ArgumentParser(description="MD run for schnet")
 parser.add_argument("-m", "--model", type=str, help="model file path")
 parser.add_argument("-i", "--initial_struct", type=str, help="Initial structure file path in xyz format")
-parser.add_argument("-log", "--log_dir", type=str, help="Logging directory")
+parser.add_argument("-dir", "--md_workdir", type=str, help="Logging directory")
+parser.add_argument("-t", "--temperature", default=300, type=float, help="Logging directory")
 args = parser.parse_args()
 
-# Set device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+md_workdir = args.md_workdir
+# Gnerate a directory of not present
+if not os.path.exists(md_workdir):
+    os.mkdir(md_workdir)
 
-# Load trained model
-model = torch.load(args.model, map_location=device)
-model = model.to(device)
-model.eval()
+# Get the parent directory of SchNetPack
+spk_path = os.path.abspath(os.path.join(os.path.dirname(spk.__file__), '../..'))
 
-# Load initial structure
-atoms = read(args.initial_struct)
-atoms.set_pbc([False, False, False])  # Disable periodic boundary conditions
+# Load model and structure
+model_path = args.model
+molecule_path = args.initial_struct
 
-# Create neighbor list object
-neighbor_list = ASENeighborList(cutoff=5.0)
+# Load atoms with ASE
+molecule = read(molecule_path)
 
-# Attach SchNet calculator
-calc = SpkCalculator(
-    model=model,
-    neighbor_list=neighbor_list,
-    energy="energy",
-    forces="forces"
+# Number of molecular replicas
+n_replicas = 1
+
+# Create system instance and load molecule
+md_system = System()
+md_system.load_molecules(
+    molecule,
+    n_replicas,
+    position_unit_input="Angstrom"
 )
-atoms.set_calculator(calc)
 
-# Initialize temperature
-MaxwellBoltzmannDistribution(atoms, temperature_K=300)
+system_temperature = args.temperature # Kelvin
 
-# Set up logger
-if not os.path.exists(args.log_dir):
-    os.makedirs(args.log_dir)
-traj = Trajectory(os.path.join(args.log_dir, "trajectory.traj"), "w", atoms)
+# Set up the initializer
+md_initializer = UniformInit(
+    system_temperature,
+    remove_center_of_mass=True,
+    remove_translation=True,
+    remove_rotation=True,
+)
 
-# Integrator
-dyn = VelocityVerlet(atoms, dt=0.5 * fs)
+# Initialize the system momenta
+md_initializer.initialize_system(md_system)
 
-# Logging callback
-def log_energy(a=atoms):
-    epot = a.get_potential_energy()
-    ekin = a.get_kinetic_energy()
-    print(f"Step: {dyn.nsteps:4d} | Epot: {epot:.4f} eV | Ekin: {ekin:.4f} eV | Etot: {epot + ekin:.4f} eV")
-    traj.write(a)
 
-dyn.attach(log_energy, interval=10)
 
-# Run simulation
-print("Starting MD simulation...")
-dyn.run(1000)
-print("MD simulation complete.")
-traj.close()
+time_step = 0.5 # fs
+
+# Set up the integrator
+md_integrator = VelocityVerlet(time_step)
+
+from schnetpack.md.neighborlist_md import NeighborListMD
+from schnetpack.transform import ASENeighborList
+
+# set cutoff and buffer region
+cutoff = 5.0  # Angstrom (units used in model)
+cutoff_shell = 2.0  # Angstrom
+
+# initialize neighbor list for MD using the ASENeighborlist as basis
+md_neighborlist = NeighborListMD(
+    cutoff,
+    cutoff_shell,
+    ASENeighborList,
+)
+
+
+
+md_calculator = SchNetPackCalculator(
+    model_path,  # path to stored model
+    "forces",  # force key
+    "eV/mol",  # energy units
+    "Angstrom",  # length units
+    md_neighborlist,  # neighbor list
+    energy_key="energy",  # name of potential energies
+    required_properties=[],  # additional properties extracted from the model
+)
+
+
+
+
+# Set temperature and thermostat constant
+bath_temperature = args.temperature  # K
+time_constant = 100  # fs
+
+# Initialize the thermostat
+langevin = LangevinThermostat(bath_temperature, time_constant)
+
+simulation_hooks = [
+    langevin
+]
+
+from schnetpack.md.simulation_hooks import callback_hooks
+
+# Path to database
+log_file = os.path.join(md_workdir, "simulation.hdf5")
+
+# Size of the buffer
+buffer_size = 100
+
+# Set up data streams to store positions, momenta and the energy
+data_streams = [
+    callback_hooks.MoleculeStream(store_velocities=True),
+    callback_hooks.PropertyStream(target_properties=[properties.energy]),
+]
+
+# Create the file logger
+file_logger = callback_hooks.FileLogger(
+    log_file,
+    buffer_size,
+    data_streams=data_streams,
+    every_n_steps=1,  # logging frequency
+    precision=32,  # floating point precision used in hdf5 database
+)
+
+# Update the simulation hooks
+simulation_hooks.append(file_logger)
+
+#Set the path to the checkpoint file
+chk_file = os.path.join(md_workdir, 'simulation.chk')
+
+# Create the checkpoint logger
+checkpoint = callback_hooks.Checkpoint(chk_file, every_n_steps=100)
+
+# Update the simulation hooks
+simulation_hooks.append(checkpoint)
+
+# check if a GPU is available and use a CPU otherwise
+if torch.cuda.is_available():
+    md_device = "cuda"
+else:
+    md_device = "cpu"
+
+# use single precision
+md_precision = torch.float32
+
+md_simulator = Simulator(
+    md_system,
+    md_integrator,
+    md_calculator,
+    simulator_hooks=simulation_hooks
+)
+# set precision
+md_simulator = md_simulator.to(md_precision)
+# move everything to target device
+md_simulator = md_simulator.to(md_device)
+
+n_steps = 200
+
+md_simulator.simulate(n_steps)
+print("Total number of steps:", md_simulator.step)

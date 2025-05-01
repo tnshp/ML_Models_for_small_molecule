@@ -176,7 +176,7 @@ def main(args):
     trainer.fit(task, train_loader, val_loader)
 
     
-    torch.save(task, os.path.join(args.output_dir, args.model_save_path))
+    torch.save(task.model, os.path.join(args.output_dir, args.model_save_path))
     print("Model saved successfully.")
 
 
