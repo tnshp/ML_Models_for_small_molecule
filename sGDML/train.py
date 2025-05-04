@@ -2,12 +2,14 @@ import sys
 import numpy as np
 import argparse 
 from sgdml.train import GDMLTrain
+import multiprocessing
 
 parser = argparse.ArgumentParser(description="Training loop for sGDML")
 
 parser.add_argument("-d","--dataset", type=str, help="dataset file path")
 parser.add_argument("-s","--save", type=str, help="model save path")
 parser.add_argument("-n","--n_train", default=200, type=int)
+
 
 parser.add_argument(
     '-e',
@@ -18,48 +20,53 @@ parser.add_argument(
 )
 
 # Parse arguments
-args = parser.parse_args()
+with multiprocessing.Pool() as pool:
+    args = parser.parse_args()
 
-dataset = np.load(args.dataset)
-n_train = args.n_train
+    dataset = np.load(args.dataset)
+    n_train = args.n_train
 
-energy_mean = np.mean(dataset['E'])
-energy_std = np.std(dataset['E'])
+    energy_mean = np.mean(dataset['E'])
+    energy_std = np.std(dataset['E'])
 
-# print("energy", dataset['E'])
-# Create a mutable dictionary from the read-only dataset
-modified_data = {key: dataset[key] for key in dataset}
+    # print("energy", dataset['E'])
+    # Create a mutable dictionary from the read-only dataset
+    modified_data = {key: dataset[key] for key in dataset}
 
-# Normalize energy
-modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
-gdml_train = GDMLTrain(use_torch=True)
+    # Normalize energy
+    modified_data['E'] = (modified_data['E'] - energy_mean) / energy_std
+    gdml_train = GDMLTrain(use_torch=True)
 
-if args.use_energy:
-    task = gdml_train.create_task(
-            modified_data, 
-            n_train,
-            valid_dataset=dataset, 
-            n_valid=len(dataset['E']) - n_train,
-            sig=20, 
-            use_sym=True,
-            lam=1e-10,
-            use_E_cstr=True,
-            use_E=True  # Focus only on energy)
-    ) 
-else:
-    task = gdml_train.create_task(
-            modified_data, 
-            n_train,
-            valid_dataset=dataset, 
-            n_valid=len(dataset['E']) - n_train,
-            sig=20, 
-            use_sym=True,  #sGDML
-            lam=1e-10,
-            use_E_cstr=False,
-            use_E=False 
-    ) 
+    if args.use_energy:
+        task = gdml_train.create_task(
+                modified_data, 
+                n_train,
+                valid_dataset=dataset, 
+                n_valid=len(dataset['E']) - n_train,
+                sig=20, 
+                use_sym=True,
+                lam=1e-10,
+                use_E_cstr=True,
+                use_E=True  # Focus only on energy)
+        ) 
+    else:
+        task = gdml_train.create_task(
+                modified_data, 
+                n_train,
+                valid_dataset=dataset, 
+                n_valid=len(dataset['E']) - n_train,
+                sig=20, 
+                use_sym=True,  #sGDML
+                lam=1e-10,
+                use_E_cstr=False,
+                use_E=False 
+        ) 
 
-model = gdml_train.train(task)
+    model = gdml_train.train(task)
 
-np.savez_compressed(args.save, **model)
-print("Model Saved!!!")
+    np.savez_compressed(args.save, **model)
+    print("Model Saved!!!")
+
+pool.close()
+pool.join()
+pool.terminate()  #
