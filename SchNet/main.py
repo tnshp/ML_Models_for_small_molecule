@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument("--max_epochs", type=int, default=5, help="Maximum number of training epochs")
     parser.add_argument("--model_save_path", type=str, default="trained_model.pth", help="Path to save the trained model")
     parser.add_argument("--num_train", type=int, default=1000, help="Number of samples to use for training")
+    parser.add_argument("--num_val", type=int, default=1000, help="Number of samples to use for training")
     parser.add_argument("--gpus", type=int, default=0, help="Number of GPUs to use (-1 for all available)")
     parser.add_argument("--early_stopping", action="store_true", help="enable early stopping")
     parser.add_argument("--force_weight", type=int, default=0.5, help="force")
