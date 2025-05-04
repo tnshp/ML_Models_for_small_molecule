@@ -1,6 +1,7 @@
 import os
 import torch
 import schnetpack as spk
+from ase import Atoms
 from schnetpack.md import UniformInit
 from schnetpack.md import System
 from schnetpack.md.integrators import VelocityVerlet
@@ -8,21 +9,28 @@ from schnetpack.md.calculators import SchNetPackCalculator
 from schnetpack import properties
 from schnetpack.md import Simulator
 from schnetpack.md.simulation_hooks import LangevinThermostat
+from ase.constraints import FixBondLengths
 from ase.io import read
 import argparse
+from scipy.spatial import cKDTree
 
 parser = argparse.ArgumentParser(description="MD run for schnet")
 parser.add_argument("-m", "--model", type=str, help="model file path")
 parser.add_argument("-i", "--initial_struct", type=str, help="Initial structure file path in xyz format")
 parser.add_argument("-dir", "--md_workdir", type=str, help="Logging directory")
-parser.add_argument("-t", "--temperature", default=300, type=float, help="Logging directory")
+parser.add_argument("--temperature", default=300, type=float, help="Logging directory")
+parser.add_argument("--n_steps", default=1000, type=int, help="Logging directory")
+parser.add_argument("--time_step", default=0.1, type=float, help="time step in femtosecond")
 args = parser.parse_args()
 
 md_workdir = args.md_workdir
 # Gnerate a directory of not present
 if not os.path.exists(md_workdir):
     os.mkdir(md_workdir)
-
+else:
+    import shutil
+    shutil.rmtree(md_workdir)
+    os.mkdir(md_workdir)
 # Get the parent directory of SchNetPack
 spk_path = os.path.abspath(os.path.join(os.path.dirname(spk.__file__), '../..'))
 
@@ -32,8 +40,20 @@ molecule_path = args.initial_struct
 
 # Load atoms with ASE
 molecule = read(molecule_path)
+c_indices = [a.index for a in molecule if a.symbol == 'C']
+h_indices = [a.index for a in molecule if a.symbol == 'H']
 
+# Find nearest C for each H using KDTree
+c_pos = molecule.positions[c_indices]
+tree = cKDTree(c_pos)
+bond_pairs = []
+for h in h_indices:
+    _, idx = tree.query(molecule.positions[h])
+    c = c_indices[idx]
+    bond_pairs.append((c, h))
 # Number of molecular replicas
+# molecule.set_constraint(FixBondLengths(bond_pairs))
+
 n_replicas = 1
 
 # Create system instance and load molecule
@@ -55,14 +75,14 @@ md_initializer = UniformInit(
 )
 
 # Initialize the system momenta
-md_initializer.initialize_system(md_system)
+# md_initializer.initialize_system(md_system)
 
 
-
-time_step = 0.5 # fs
+time_step = args.time_step # fs
 
 # Set up the integrator
 md_integrator = VelocityVerlet(time_step)
+# md_integrator = Rattle(time_step, bonds=bond_pairs)
 
 from schnetpack.md.neighborlist_md import NeighborListMD
 from schnetpack.transform import ASENeighborList
@@ -79,11 +99,12 @@ md_neighborlist = NeighborListMD(
 )
 
 
-
+eV_to_kcalmol  = 23.0605
 md_calculator = SchNetPackCalculator(
     model_path,  # path to stored model
-    "forces",  # force key
-    "eV/mol",  # energy units
+    "forces",
+    eV_to_kcalmol,
+    # 'eV/mol',
     "Angstrom",  # length units
     md_neighborlist,  # neighbor list
     energy_key="energy",  # name of potential energies
@@ -159,7 +180,7 @@ md_simulator = md_simulator.to(md_precision)
 # move everything to target device
 md_simulator = md_simulator.to(md_device)
 
-n_steps = 200
+n_steps = args.n_steps
 
 md_simulator.simulate(n_steps)
 print("Total number of steps:", md_simulator.step)

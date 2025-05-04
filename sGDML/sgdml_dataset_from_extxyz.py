@@ -173,7 +173,7 @@ else:  # legacy non-standard XYZ format
         R, z, E, F = read_nonstd_ext_xyz(f)
 
         E = E - np.min(E)
-        print(E[0:5])
+        # print(E[0:5])
         # F = F/4184
 # print(E)
 # Base variables contained in every model file.

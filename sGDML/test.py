@@ -108,7 +108,7 @@ mae_energy = mae(energies, np.array(predicted_energy))
 # Calculate MSE and MAE for forces
 
 mae_forces = mae(forces, predicted_forces)
-
+rmse_forces = rmse(forces, predicted_forces)
 # Print the RMSE and MAE results
 print(f"RMSE for Energy: {rmse_energy:.6f}")
 print(f"MAE for Energy: {mae_energy:.6f}")

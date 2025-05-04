@@ -5,8 +5,8 @@ from schnetpack.md.data import HDF5Loader
 from ase.io import read, write
 import os 
 
-md_workdir = 'md_run'
-log_file = 'md_run/simulation.hdf5'
+md_workdir='md_run'
+log_file='md_run/simulation.hdf5'
 data = HDF5Loader(log_file)
 
 for prop in data.properties:
@@ -29,11 +29,10 @@ time_axis = np.arange(data.entries) * data.time_step / spk_units.fs  # in fs
 energies_system *= spk_units.convert_units("eV/mol", "kcal/mol")
 # Plot the energies
 plt.figure()
-plt.plot(time_axis, energies_system, label="E$_\mathrm{pot}$ (System)")
+# plt.plot(time_axis, energies_system, label="E$_\mathrm{pot}$ (System)")
 plt.plot(time_axis, energies_calculator, label="E$_\mathrm{pot}$ (Logger)", ls="--")
 plt.ylabel("E [kcal/mol]")
 plt.xlabel("t [fs]")
-# plt.xlim(9800,10000)
 plt.legend()
 plt.tight_layout()
 plt.show()
