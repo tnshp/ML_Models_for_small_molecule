@@ -19,8 +19,9 @@ parser.add_argument("-m", "--model", type=str, help="model file path")
 parser.add_argument("-i", "--initial_struct", type=str, help="Initial structure file path in xyz format")
 parser.add_argument("-dir", "--md_workdir", type=str, help="Logging directory")
 parser.add_argument("--temperature", default=300, type=float, help="Logging directory")
-parser.add_argument("--n_steps", default=1000, type=int, help="Logging directory")
-parser.add_argument("--time_step", default=0.1, type=float, help="time step in femtosecond")
+parser.add_argument("--n_steps", default=2000, type=int, help="Logging directory")
+parser.add_argument("--time_step", default=0.2, type=float, help="time step in femtosecond")
+parser.add_argument("--damping", default=200, type=float, help="time step in femtosecond")
 args = parser.parse_args()
 
 md_workdir = args.md_workdir
@@ -116,7 +117,7 @@ md_calculator = SchNetPackCalculator(
 
 # Set temperature and thermostat constant
 bath_temperature = args.temperature  # K
-time_constant = 100  # fs
+time_constant = args.damping  # fs
 
 # Initialize the thermostat
 langevin = LangevinThermostat(bath_temperature, time_constant)
