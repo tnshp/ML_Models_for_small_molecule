@@ -18,13 +18,13 @@ parser = argparse.ArgumentParser(description="MD run for schnet")
 parser.add_argument("-m", "--model", type=str, help="model file path")
 parser.add_argument("-i", "--initial_struct", type=str, help="Initial structure file path in xyz format")
 parser.add_argument("-dir", "--md_workdir", type=str, help="Logging directory")
-parser.add_argument("--temperature", default=300, type=float, help="Logging directory")
+parser.add_argument("--temperature", default=400, type=float, help="Logging directory")
 parser.add_argument("--n_steps", default=2000, type=int, help="Logging directory")
-parser.add_argument("--time_step", default=0.2, type=float, help="time step in femtosecond")
+parser.add_argument("--time_step", default=0.1, type=float, help="time step in femtosecond")
 parser.add_argument("--damping", default=200, type=float, help="time step in femtosecond")
 args = parser.parse_args()
-
-md_workdir = args.md_workdir
+ 
+md_workdir = args.md_workdir 
 # Gnerate a directory of not present
 if not os.path.exists(md_workdir):
     os.mkdir(md_workdir)
@@ -76,7 +76,7 @@ md_initializer = UniformInit(
 )
 
 # Initialize the system momenta
-# md_initializer.initialize_system(md_system)
+md_initializer.initialize_system(md_system)
 
 
 time_step = args.time_step # fs
@@ -114,7 +114,6 @@ md_calculator = SchNetPackCalculator(
 
 
 
-
 # Set temperature and thermostat constant
 bath_temperature = args.temperature  # K
 time_constant = args.damping  # fs
@@ -145,7 +144,7 @@ file_logger = callback_hooks.FileLogger(
     log_file,
     buffer_size,
     data_streams=data_streams,
-    every_n_steps=1,  # logging frequency
+    every_n_steps=5,  # logging frequency
     precision=32,  # floating point precision used in hdf5 database
 )
 
@@ -157,8 +156,6 @@ chk_file = os.path.join(md_workdir, 'simulation.chk')
 
 # Create the checkpoint logger
 checkpoint = callback_hooks.Checkpoint(chk_file, every_n_steps=100)
-
-# Update the simulation hooks
 simulation_hooks.append(checkpoint)
 
 # check if a GPU is available and use a CPU otherwise
@@ -166,7 +163,7 @@ if torch.cuda.is_available():
     md_device = "cuda"
 else:
     md_device = "cpu"
-
+print(f'running on {md_device}')
 # use single precision
 md_precision = torch.float32
 
@@ -183,5 +180,7 @@ md_simulator = md_simulator.to(md_device)
 
 n_steps = args.n_steps
 
-md_simulator.simulate(n_steps)
 print("Total number of steps:", md_simulator.step)
+md_simulator.simulate(n_steps)
+
+

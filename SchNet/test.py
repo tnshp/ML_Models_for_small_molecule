@@ -1,11 +1,10 @@
-import os
+import os 
 import torch
 import numpy as np
 from ase import Atoms
 import schnetpack as spk
 import schnetpack.transform as trn
 from schnetpack.data import ASEAtomsData
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 import argparse
 
 def main():
@@ -29,7 +28,11 @@ def main():
 
     # Load the dataset (make sure the paths and property names are correct)
     dataset = ASEAtomsData(args.db_path, load_properties=['forces', 'energy'])
-
+    #sample 4000 random points from the dataset
+    val = range(len(dataset))  # Get the indices of the dataset
+    val = np.random.choice(val, size=4000, replace=False)
+    dataset = dataset.subset(val)  # Sample the first 4000 entries
+  
     # Initialize lists to store the true and predicted values
     all_forces = []
     all_energy = []

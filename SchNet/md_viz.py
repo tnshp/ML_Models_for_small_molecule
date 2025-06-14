@@ -5,13 +5,12 @@ from schnetpack.md.data import HDF5Loader
 from ase.io import read, write
 import os 
 
-md_workdir='md_run'
-log_file='md_run/simulation.hdf5'
+md_workdir='ums'
+log_file='ums/simulation.hdf5'
 data = HDF5Loader(log_file)
 
 for prop in data.properties:
     print(prop)
-
 
 
 # Get the energy logged via PropertiesStream
@@ -35,6 +34,7 @@ plt.ylabel("E [eV/mol]")
 plt.xlabel("t [fs]")
 plt.legend()
 plt.tight_layout()
+plt.savefig(os.path.join(md_workdir, "energies.png"), dpi=300)
 plt.show()
 
 md_atoms = data.convert_to_atoms()
