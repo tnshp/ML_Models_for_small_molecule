@@ -86,7 +86,7 @@ def main(args):
         split_file=None
     )
 
-    print(f"total dataset length: {len(custom_data.dataset)}")
+    # print(f"total dataset length: {len(custom_data.dataset)}")
     custom_data.prepare_data()
     custom_data.setup()
 
