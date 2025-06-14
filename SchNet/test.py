@@ -24,18 +24,18 @@ def main():
     # Set up the converter for converting ASE Atoms objects to SchNetPack inputs
     converter = spk.interfaces.AtomsConverter(
         neighbor_list=trn.ASENeighborList(cutoff=5.0), dtype=torch.float32, device=device
-    )
+    ) 
 
     # Load the dataset (make sure the paths and property names are correct)
     dataset = ASEAtomsData(args.db_path, load_properties=['forces', 'energy'])
+    # dataset = dataset.subset(range(1000, len(dataset)))
     #sample 4000 random points from the dataset
-    val = range(len(dataset))  # Get the indices of the dataset
-    val = np.random.choice(val, size=4000, replace=False)
+    val = np.random.choice(len(dataset), size=4000, replace=False).tolist()  # Convert to Python list
     dataset = dataset.subset(val)  # Sample the first 4000 entries
-  
+    dataset.subset
     # Initialize lists to store the true and predicted values
     all_forces = []
-    all_energy = []
+    all_energy = [] 
 
     forces = []
     energy = []
