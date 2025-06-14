@@ -7,6 +7,18 @@ import schnetpack.transform as trn
 from schnetpack.data import ASEAtomsData
 import argparse
 
+# Function to calculate RMSE
+def rmse(true_values, predicted_values):
+    val = (true_values - predicted_values) ** 2
+    #remove outliers 
+    val = np.where(np.abs(val) < 300, val, 0)  # Set outliers to 0
+    val = np.sqrt(np.mean(val))
+    return val
+
+# Function to calculate MAE
+def mae(true_values, predicted_values):
+    return np.mean(np.abs(true_values - predicted_values))
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Evaluate SchNet model')
@@ -86,13 +98,7 @@ def main():
 
     # Compute the RMSE and MAE for forces and energy
 
-    # Function to calculate RMSE
-    def rmse(true_values, predicted_values):
-        return np.sqrt(np.mean((true_values - predicted_values) ** 2))
-
-    # Function to calculate MAE
-    def mae(true_values, predicted_values):
-        return np.mean(np.abs(true_values - predicted_values))
+    
 
     # Compute RMSE and MAE for forces
     rmse_forces = rmse(all_forces, predicted_forces)

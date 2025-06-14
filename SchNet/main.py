@@ -57,7 +57,12 @@ class PrintLossEveryNEpochs(Callback):
 
 def main(args):
     # Load dataset, focusing only on forces
-    dataset = ASEAtomsData(args.db_file, load_properties=['forces'])
+    dataset = ASEAtomsData(args.db_file, 
+                           load_properties=['forces'],
+                           available_properties=['forces'],  # Explicitly declare properties
+                           units={'forces': 'kcal/mol/Ang'}  # Manually specify units
+    )
+
     print(f"Total dataset length: {len(dataset)}")
 
     # Set num_train and calculate num_val
@@ -66,7 +71,7 @@ def main(args):
 
     # Use the file path directly for AtomsDataModule
     custom_data = spk.data.AtomsDataModule(
-        datapath=args.db_file,
+        datapath=dataset,
         batch_size=args.batch_size,
         distance_unit='Ang',
         property_units={'forces':'kcal/mol/Ang'},
