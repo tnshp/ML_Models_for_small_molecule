@@ -57,21 +57,21 @@ class PrintLossEveryNEpochs(Callback):
 
 def main(args):
     # Load dataset, focusing only on forces
-    dataset = ASEAtomsData(args.db_file, 
-                           load_properties=['forces'],
-                           available_properties=['forces'],  # Explicitly declare properties
-                           units={'forces': 'kcal/mol/Ang'}  # Manually specify units
-    )
+    # dataset = ASEAtomsData(args.db_file, 
+    #                        load_properties=['forces'],
+    #                        available_properties=['forces'],  # Explicitly declare properties
+    #                        units={'forces': 'kcal/mol/Ang'}  # Manually specify units
+    # )
 
-    print(f"Total dataset length: {len(dataset)}")
+    # print(f"Total dataset length: {len(dataset)}")
 
-    # Set num_train and calculate num_val
-    args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
+    # # Set num_train and calculate num_val
+    # args.num_train = min(args.num_train, len(dataset) - 1)  # Ensure at least one sample for validation
     print(f"Using {args.num_train} training sample and {args.num_val} validation for {args.max_epochs} epochs")
 
     # Use the file path directly for AtomsDataModule
     custom_data = spk.data.AtomsDataModule(
-        datapath=dataset,
+        datapath=args.db_file,
         batch_size=args.batch_size,
         distance_unit='Ang',
         property_units={'forces':'kcal/mol/Ang'},
@@ -86,6 +86,7 @@ def main(args):
         split_file=None
     )
 
+    print(f"total dataset length: {len(custom_data.dataset)}")
     custom_data.prepare_data()
     custom_data.setup()
 
